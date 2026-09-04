@@ -1,0 +1,1450 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B2送り状 変換ツール</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --paper:#EFF2F1; --surface:#FFFFFF; --surface-2:#F6F8F7; --surface-3:#E9EEEC;
+  --ink:#141A18; --muted:#5B6866; --rule:#D5DCDA; --rule-soft:#E4E9E7;
+  --accent:#15624A; --accent-ink:#0E4635; --accent-soft:#DCEAE4;
+  --alert:#A63625; --alert-soft:#F7E6E2;
+  --warn:#8A6710; --warn-soft:#F6EDD6;
+  --ok:#1F6B4E;
+  --shadow:0 1px 2px rgba(20,26,24,.05), 0 10px 28px -20px rgba(20,26,24,.35);
+  --display:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  --body:"Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#0F1413; --surface:#171E1C; --surface-2:#1C2523; --surface-3:#232E2B;
+    --ink:#E5EBE8; --muted:#93A29D; --rule:#28322F; --rule-soft:#212B28;
+    --accent:#6BC4A1; --accent-ink:#8FD7BA; --accent-soft:#17322A;
+    --alert:#E9866F; --alert-soft:#34211D;
+    --warn:#D6B155; --warn-soft:#302713;
+    --ok:#6BC4A1;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -20px rgba(0,0,0,.9);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0F1413; --surface:#171E1C; --surface-2:#1C2523; --surface-3:#232E2B;
+  --ink:#E5EBE8; --muted:#93A29D; --rule:#28322F; --rule-soft:#212B28;
+  --accent:#6BC4A1; --accent-ink:#8FD7BA; --accent-soft:#17322A;
+  --alert:#E9866F; --alert-soft:#34211D;
+  --warn:#D6B155; --warn-soft:#302713;
+  --ok:#6BC4A1;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -20px rgba(0,0,0,.9);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.7;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:0 18px 80px}
+
+/* header */
+header.top{background:var(--surface);border-bottom:1px solid var(--rule)}
+.top-in{max-width:1180px;margin:0 auto;padding:20px 18px 0;display:flex;flex-wrap:wrap;align-items:flex-end;gap:16px;justify-content:space-between}
+.brand h1{font-family:var(--display);font-weight:700;font-size:19px;margin:0;letter-spacing:.01em}
+.brand p{margin:2px 0 0;color:var(--muted);font-size:12.5px}
+.storepick{display:flex;align-items:center;gap:8px;padding-bottom:2px}
+.storepick label{font-size:12px;color:var(--muted)}
+nav.tabs{max-width:1180px;margin:0 auto;padding:14px 18px 0;display:flex;gap:2px}
+nav.tabs button{
+  font-family:var(--display);font-weight:500;font-size:13.5px;
+  background:none;border:none;border-bottom:2px solid transparent;
+  color:var(--muted);padding:8px 14px 10px;cursor:pointer;
+}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+nav.tabs button:hover{color:var(--ink)}
+
+/* panels */
+.panel{margin-top:26px}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:8px;box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+.card > .hd{display:flex;align-items:baseline;gap:10px;padding:14px 18px;border-bottom:1px solid var(--rule-soft);background:var(--surface-2)}
+.card > .hd .n{font-family:var(--mono);font-size:11px;color:var(--accent);background:var(--accent-soft);border-radius:3px;padding:2px 7px;font-weight:600}
+.card > .hd h2{font-family:var(--display);font-weight:700;font-size:14.5px;margin:0}
+.card > .hd .sub{font-size:12px;color:var(--muted);margin-left:auto;text-align:right}
+.card > .bd{padding:16px 18px}
+.card > details{border-top:none}
+.card > details > summary{list-style:none;cursor:pointer;padding:12px 18px;display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+.card > details > summary::-webkit-details-marker{display:none}
+.card > details > summary::before{content:'▸';font-size:10px;color:var(--muted);width:8px}
+.card > details[open] > summary::before{content:'▾'}
+.card > details[open] > summary{border-bottom:1px solid var(--rule-soft);background:var(--surface-2)}
+.card > details > summary b{color:var(--ink);font-weight:500}
+.card > details > summary .editHint{margin-left:auto;color:var(--accent);font-size:11.5px}
+
+.grid{display:grid;gap:12px 16px}
+@media(min-width:640px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:900px){.g4{grid-template-columns:repeat(4,1fr)}}
+
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+label.f > span{font-weight:500}
+input[type=text],input[type=date],input[type=number],select,textarea{
+  font-family:var(--body);font-size:13.5px;color:var(--ink);
+  background:var(--surface);border:1px solid var(--rule);border-radius:5px;
+  padding:7px 9px;width:100%;
+}
+input:focus-visible,select:focus-visible,button:focus-visible,td[contenteditable]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.mono{font-family:var(--mono)}
+.hint{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+button.btn{
+  font-family:var(--display);font-weight:500;font-size:13px;
+  background:var(--accent);color:#fff;border:1px solid var(--accent);
+  border-radius:6px;padding:8px 16px;cursor:pointer;
+}
+:root[data-theme="dark"] button.btn,
+:root:not([data-theme="light"]) button.btn{color:#0F1413}
+@media(prefers-color-scheme:light){:root:not([data-theme="dark"]) button.btn{color:#fff}}
+button.btn:hover{filter:brightness(1.08)}
+button.btn[disabled]{opacity:.45;cursor:not-allowed;filter:none}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--rule);font-family:var(--display);font-size:12.5px;border-radius:6px;padding:7px 13px;cursor:pointer}
+button.ghost:hover{background:var(--surface-2)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+
+/* dropzone */
+.drop{
+  border:1.5px dashed var(--rule);border-radius:8px;background:var(--surface-2);
+  padding:22px 18px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;
+}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop .big{font-family:var(--display);font-weight:500;font-size:14px;display:block}
+.drop .sm{font-size:12px;color:var(--muted)}
+.drop.loaded{border-style:solid;border-color:var(--accent);background:var(--surface)}
+.fileinfo{font-family:var(--mono);font-size:12px;color:var(--accent)}
+
+/* mapping */
+.maprow{display:grid;grid-template-columns:1fr;gap:4px}
+@media(min-width:520px){.maprow{grid-template-columns:150px 1fr;align-items:center;gap:8px}}
+.maprow .lbl{font-size:12.5px}
+.maprow .lbl .req{color:var(--alert);font-size:10px;margin-left:4px;font-family:var(--mono)}
+.maplist{display:grid;gap:8px}
+@media(min-width:900px){.maplist{grid-template-columns:1fr 1fr;gap:8px 24px}}
+
+/* table */
+.tablewrap{overflow:auto;max-height:460px;border-top:1px solid var(--rule-soft)}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:12.5px}
+th,td{padding:6px 10px;border-bottom:1px solid var(--rule-soft);white-space:nowrap;text-align:left;vertical-align:top}
+thead th{
+  position:sticky;top:0;z-index:2;background:var(--surface-2);
+  font-family:var(--display);font-weight:500;font-size:11px;color:var(--muted);
+  border-bottom:1px solid var(--rule);
+}
+tbody tr:nth-child(even) td{background:var(--surface-2)}
+td.idx{font-family:var(--mono);color:var(--muted);font-size:11px;position:sticky;left:0;background:var(--surface);z-index:1}
+tbody tr:nth-child(even) td.idx{background:var(--surface-2)}
+td[contenteditable]{min-width:70px}
+td.bad{background:var(--alert-soft)!important;box-shadow:inset 2px 0 0 var(--alert)}
+td.warn{background:var(--warn-soft)!important;box-shadow:inset 2px 0 0 var(--warn)}
+
+.status{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px}
+.pill{font-family:var(--mono);font-size:11.5px;padding:3px 9px;border-radius:20px;background:var(--surface-3);color:var(--muted)}
+.pill.err{background:var(--alert-soft);color:var(--alert)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.ok{background:var(--accent-soft);color:var(--accent)}
+
+.msgs{margin:0;padding:0;list-style:none;font-size:12.5px}
+.msgs li{padding:5px 0;border-bottom:1px dotted var(--rule-soft);color:var(--muted)}
+.msgs li:last-child{border-bottom:none}
+.msgs b{color:var(--ink);font-weight:500}
+.msgs .tagE{color:var(--alert);font-family:var(--mono);font-size:11px;margin-right:6px}
+.msgs .tagW{color:var(--warn);font-family:var(--mono);font-size:11px;margin-right:6px}
+
+.note{background:var(--surface-2);border:1px solid var(--rule-soft);border-left:3px solid var(--accent);border-radius:0 6px 6px 0;padding:12px 14px;font-size:12.5px;color:var(--muted);margin:0 0 14px}
+.note b{color:var(--ink);font-weight:500}
+.note.warn{border-left-color:var(--warn)}
+[hidden]{display:none!important}
+.empty{padding:26px 18px;text-align:center;color:var(--muted);font-size:13px}
+footer.foot{max-width:1180px;margin:0 auto;padding:24px 18px 0;border-top:1px solid var(--rule);color:var(--muted);font-size:12px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <h1>ヤフオク → 送り状CSV 変換ツール</h1>
+      <p>ストアクリエイターProの注文CSVを、ヤマトB2クラウド / 佐川e飛伝Ⅲが取り込める形に整形します</p>
+    </div>
+    <div class="storepick">
+      <label for="storeSel">店舗</label>
+      <select id="storeSel" style="width:auto;min-width:150px"></select>
+    </div>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button id="tab1" role="tab" aria-selected="true" aria-controls="mode1">送り状CSVを作る</button>
+    <button id="tab2" role="tab" aria-selected="false" aria-controls="mode2">伝票番号を戻す</button>
+  </nav>
+</header>
+
+<div class="wrap">
+
+<!-- ============ MODE 1 ============ -->
+<section class="panel" id="mode1" role="tabpanel" aria-labelledby="tab1">
+
+  <div class="card">
+    <div class="hd"><span class="n">1</span><h2>ご依頼主・請求先の設定</h2><span class="sub">この端末に保存されます</span></div>
+    <details id="storeDetails">
+      <summary id="storeSummary"><b>—</b><span class="editHint">クリックして編集</span></summary>
+      <div class="bd">
+        <div class="grid g3">
+          <label class="f"><span>ご依頼主名（店舗名）</span><input type="text" id="s_name" maxlength="32" placeholder="PLAYMART 石川小松店"></label>
+          <label class="f"><span>ご依頼主 電話番号</span><input type="text" id="s_tel" class="mono" placeholder="0761-00-0000"></label>
+          <label class="f"><span>ご依頼主 郵便番号</span><input type="text" id="s_zip" class="mono" placeholder="923-0000"></label>
+        </div>
+        <div class="grid g2" style="margin-top:12px">
+          <label class="f"><span>ご依頼主 住所</span><input type="text" id="s_addr" placeholder="石川県小松市○○町1-2-3"></label>
+          <div class="grid g2">
+            <label class="f"><span>ご請求先顧客コード<span style="color:var(--alert)"> ●</span></span><input type="text" id="s_cust" class="mono" maxlength="12" placeholder="9〜12桁"></label>
+            <label class="f"><span>運賃管理番号<span style="color:var(--alert)"> ●</span></span><input type="text" id="s_fare" class="mono" maxlength="2" placeholder="2桁"></label>
+          </div>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <button class="ghost" id="saveStore">この店舗設定を保存</button>
+          <span class="hint" id="saveMsg"></span>
+        </div>
+        <p class="hint">● 印はB2クラウドの必須項目です。B2クラウドの「1件ずつ発行」画面の基本情報 → ご請求先情報で確認できます。URLに <span class="mono">?store=ishikawa</span> のように付けると店舗を直接指定できます。</p>
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <div class="hd"><span class="n">2</span><h2>注文CSVを読み込む</h2><span class="sub">Shift_JIS / UTF-8 自動判定</span></div>
+    <div class="bd">
+      <div class="drop" id="dropOrders" tabindex="0" role="button">
+        <span class="big">注文情報CSV（orders.csv）</span>
+        <span class="sm">クリックまたはドロップ</span>
+        <div class="fileinfo" id="infoOrders"></div>
+      </div>
+      <input type="file" id="fileOrders" accept=".csv,.txt" hidden>
+      <p class="hint">ストアクリエイターPro → 注文管理 → 注文検索 → 注文データダウンロード で取得したファイル。商品明細（<span class="mono">Title</span> など）も同じファイルに入っているので、これ1本で足ります。</p>
+    </div>
+  </div>
+
+  <div class="card" id="cardMap" hidden>
+    <div class="hd"><span class="n">3</span><h2>列の対応</h2><span class="sub">見出し名から自動で推定しています</span></div>
+    <div class="bd">
+      <div class="maplist" id="mapList"></div>
+    </div>
+  </div>
+
+  <div class="card" id="cardFilter" hidden>
+    <div class="hd"><span class="n">4</span><h2>配送会社の振り分け</h2><span class="sub">ヤマト / 佐川</span></div>
+    <div class="bd">
+      <p class="hint" style="margin-top:0">配送方法ごとに、どちらの送り状システムへ回すかを決めます。配送方法名から自動で推定しますが、ここで手動で変えられます。「使わない」にした件数はプレビューに「対象外 N件」と表示されます。設定はこの端末に保存されます。</p>
+      <div id="filterList" class="maplist"></div>
+      <div class="row" style="margin-top:14px">
+        <button class="ghost" id="btnGuess">配送方法名から推定し直す</button>
+        <button class="ghost" id="btnNone">すべて「使わない」</button>
+      </div>
+      <div id="eachWrap" hidden style="margin-top:18px;padding-top:16px;border-top:1px dashed var(--rule)">
+        <div class="row" style="justify-content:space-between;align-items:baseline">
+          <span style="font-family:var(--display);font-weight:700;font-size:13.5px">注文ごとの指定</span>
+          <span class="row" style="gap:8px">
+            <button class="ghost" id="btnEachY">すべてヤマト</button>
+            <button class="ghost" id="btnEachS">すべて佐川</button>
+            <button class="ghost" id="btnEachN">すべて使わない</button>
+          </span>
+        </div>
+        <p class="hint" style="margin-top:4px">「注文ごとに決める」にした配送方法の注文です。落札後に配送業者を決める分は、ここで1件ずつ指定してください。指定しない注文は書き出されません。</p>
+        <div class="tablewrap" style="max-height:300px;border:1px solid var(--rule);border-radius:6px;margin-top:10px">
+          <table id="eachTable"><thead></thead><tbody></tbody></table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="cardOpt" hidden>
+    <div class="hd"><span class="n">5</span><h2>発送条件</h2></div>
+    <div class="bd">
+      <div class="grid g4">
+        <label class="f"><span>出荷予定日</span><input type="date" id="o_date"></label>
+        <label class="f"><span>送り状種類</span>
+          <select id="o_kind">
+            <option value="0">0 発払（宅急便）</option>
+            <option value="5">5 着払</option>
+            <option value="7">7 ネコポス</option>
+            <option value="8">8 宅急便コンパクト</option>
+            <option value="3">3 クロネコDM便</option>
+            <option value="4">4 タイムサービス</option>
+          </select>
+        </label>
+        <label class="f"><span>敬称</span><input type="text" id="o_hono" maxlength="4" value="様"></label>
+        <label class="f"><span>品名にする内容</span>
+          <select id="o_nameSrc">
+            <option value="item">商品名の列をそのまま</option>
+            <option value="col">指定した列をそのまま（申し送り事項など）</option>
+            <option value="fixed">固定文言</option>
+          </select>
+        </label>
+      </div>
+      <div class="grid g3" style="margin-top:12px">
+        <label class="f" id="wrapNameCol" hidden><span>品名にする列</span><select id="o_nameCol"></select></label>
+        <label class="f" id="wrapItem"><span>品名の既定値（空のときに使う）</span><input type="text" id="o_item" maxlength="25" placeholder="中古楽器"></label>
+        <label class="f"><span>複数商品のとき</span>
+          <select id="o_multi">
+            <option value="first">先頭＋「他N点」</option>
+            <option value="all">全部つなげる</option>
+          </select>
+        </label>
+        <label class="f"><span>全角25文字を超えたら</span>
+          <select id="o_over">
+            <option value="split">続きを品名2に入れる（計50文字まで）</option>
+            <option value="cut">25文字で切る</option>
+            <option value="keep">そのまま（要修正として表示）</option>
+          </select>
+        </label>
+      </div>
+      <div class="row" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--rule-soft)">
+        <span style="font-size:12px;color:var(--muted);font-weight:500">品名の整形</span>
+        <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="o_stripL" checked style="width:auto"> <span class="mono">L1=</span> などの明細プレフィックスを外す</label>
+        <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="o_stripB" checked style="width:auto"> 先頭の【A】【G】などを外す</label>
+        <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="o_stripN" checked style="width:auto"> 末尾の管理番号を品名から外す</label>
+        <label class="row" style="gap:6px;font-size:12.5px">オークションIDは
+          <select id="o_aucTo" style="width:auto">
+            <option value="note" selected>記事欄へ（管理番号のうしろに併記）</option>
+            <option value="nimo">荷扱い1へ</option>
+            <option value="key">検索キー2へ（印字なし・B2内の検索用）</option>
+            <option value="drop">使わない</option>
+          </select>
+        </label>
+        <label class="row" style="gap:6px;font-size:12.5px">外した管理番号は
+          <select id="o_numTo" style="width:auto">
+            <option value="note">記事欄へ（送り状の最終行）</option>
+            <option value="name2">品名2の末尾へ</option>
+            <option value="drop">使わない</option>
+          </select>
+        </label>
+      </div>
+      <label class="f" style="margin-top:10px"><span>ほかに削除する語（カンマ区切り）</span><input type="text" id="o_strip" placeholder="中古, 送料無料, 美品"></label>
+      <div class="row" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--rule-soft)">
+        <span style="font-size:12px;color:var(--muted);font-weight:500">佐川e飛伝Ⅲ</span>
+        <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="o_hoken" checked style="width:auto"> 保険金額に落札額を入れる</label>
+        <label class="row" style="gap:6px;font-size:12.5px">保険金額印字
+          <select id="o_hokenP" style="width:auto">
+            <option value="">未指定（空）</option>
+            <option value="1">1（印字する）</option>
+            <option value="0">0（印字しない）</option>
+          </select>
+        </label>
+        <label class="row" style="gap:6px;font-size:12.5px">お届け先コード取得区分
+          <select id="o_sgCode" style="width:auto">
+            <option value="">空のまま</option>
+            <option value="0">0 を出力</option>
+          </select>
+        </label>
+        <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="o_caremark" checked style="width:auto"> ケアマーク（取扱注意・天地無用）を毎回付ける<span class="mono" style="color:var(--muted)">（指定シール1=011, 2=013）</span></label>
+      </div>
+      <div class="row" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--rule-soft)">
+        <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="o_merge" style="width:auto"> 同じ落札者の複数注文を1件にまとめる</label>
+        <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="o_reqdate" checked style="width:auto"> 配達希望日・時間帯を反映する</label>
+        <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="o_dropCod" checked style="width:auto"> 代引の注文は書き出さない（全業者）</label>
+        <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="o_dropEmpty" checked style="width:auto"> 全行が空の列は書き出さない（ヤマトのみ）</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="cardPrev" hidden>
+    <div class="hd">
+      <span class="n">6</span><h2>プレビューと検証</h2>
+      <span class="row" style="gap:2px;margin-left:12px">
+        <button class="ghost" id="viewY" style="border-radius:6px 0 0 6px">ヤマト</button>
+        <button class="ghost" id="viewS" style="border-radius:0 6px 6px 0">佐川</button>
+      </span>
+      <span class="sub"><span class="status" id="statusBar"></span></span>
+    </div>
+    <div id="msgBox" class="bd" hidden><ul class="msgs" id="msgs"></ul></div>
+    <div class="tablewrap"><table id="prevTable"><thead></thead><tbody></tbody></table></div>
+    <div class="bd" style="border-top:1px solid var(--rule-soft)">
+      <p class="hint" style="margin-top:0">セルを直接クリックして修正できます。修正するとその行だけ再チェックされます。表示は先頭200行ですが、書き出しは全件です。</p>
+      <div class="row">
+        <label class="f" style="width:auto"><span>文字コード</span>
+          <select id="o_enc" style="width:auto"><option value="sjis">Shift_JIS（推奨）</option><option value="utf8">UTF-8（BOM付き）</option></select>
+        </label>
+        <button class="btn" id="dlB2">ヤマトB2用CSV</button>
+        <button class="btn" id="dlSG">佐川e飛伝用CSV</button>
+        <button class="ghost" id="dlMap">注文番号↔管理番号の対応表</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="cardEmpty">
+    <div class="empty">注文情報CSVを読み込むと、ここに変換結果が表示されます。</div>
+  </div>
+</section>
+
+<!-- ============ MODE 2 ============ -->
+<section class="panel" id="mode2" role="tabpanel" aria-labelledby="tab2" hidden>
+
+  <div class="note">
+    B2クラウドの<b>「発行済データの検索 → 外部ファイルに出力」</b>で、<b>「1行目に見出しを出力する」にチェックを入れて</b>出力したCSVを読み込んでください。お客様管理番号と伝票番号を突き合わせて、ストアクリエイターProの注文処理実績アップロード用CSVを作ります。
+  </div>
+
+  <div class="card">
+    <div class="hd"><span class="n">1</span><h2>B2の発行済データCSVを読み込む</h2></div>
+    <div class="bd">
+      <div class="drop" id="dropB2" tabindex="0" role="button">
+        <span class="big">発行済データCSV</span>
+        <span class="sm">クリックまたはドロップ</span>
+        <div class="fileinfo" id="infoB2"></div>
+      </div>
+      <input type="file" id="fileB2" accept=".csv,.txt" hidden>
+    </div>
+  </div>
+
+  <div class="card" id="cardB2Map" hidden>
+    <div class="hd"><span class="n">2</span><h2>列と出力形式</h2></div>
+    <div class="bd">
+      <div class="maplist">
+        <div class="maprow"><div class="lbl">注文番号の列<span class="req">必須</span></div><select id="b2_order"></select></div>
+        <div class="maprow"><div class="lbl">伝票番号の列<span class="req">必須</span></div><select id="b2_inv"></select></div>
+      </div>
+      <div class="grid g4" style="margin-top:16px">
+        <label class="f"><span>出荷日（ShipDate）</span><input type="date" id="b2_date"></label>
+        <label class="f"><span>出荷ステータス</span>
+          <select id="b2_status"><option value="3">3 出荷済み</option><option value="2">2 出荷処理中</option><option value="1">1 出荷可</option></select>
+        </label>
+        <label class="f"><span>配送会社コード</span>
+          <select id="b2_company"><option value="1001">1001 ヤマト運輸</option><option value="1002">1002 佐川急便</option><option value="1000">1000 その他</option></select>
+        </label>
+        <label class="f"><span>ヘッダーの列名</span>
+          <input type="text" id="b2_headers" class="mono" value="OrderId,ShipStatus,ShipInvoiceNumber1,ShipCompanyCode,ShipDate">
+        </label>
+      </div>
+      <p class="hint">列名はストアクリエイターProのアップロード仕様に合わせて変更できます。既定値はYahoo!の注文項目名です。初回は数件で試してから本番に流してください。</p>
+    </div>
+  </div>
+
+  <div class="card" id="cardB2Prev" hidden>
+    <div class="hd"><span class="n">3</span><h2>出力プレビュー</h2><span class="sub"><span class="status" id="b2Status"></span></span></div>
+    <div class="tablewrap"><table id="b2Table"><thead></thead><tbody></tbody></table></div>
+    <div class="bd" style="border-top:1px solid var(--rule-soft)">
+      <div class="row">
+        <label class="f" style="width:auto"><span>文字コード</span>
+          <select id="b2_enc" style="width:auto"><option value="utf8">UTF-8（BOM付き）</option><option value="sjis">Shift_JIS</option></select>
+        </label>
+        <button class="btn" id="dlShip">注文処理実績アップロード用CSVをダウンロード</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="cardB2Empty">
+    <div class="empty">発行済データCSVを読み込むと、ここに出力内容が表示されます。</div>
+  </div>
+</section>
+
+<footer class="foot">
+  <p><b>ヤマトB2クラウド：</b>「外部データから発行」→ 取込みパターン「新規レイアウト」。紐付けは取込み開始行「1」で行い、実行時は「2」に変更します。文字コードはShift_JIS。</p>
+  <p><b>佐川e飛伝Ⅲ：</b>「送り状データ取込」→ テンプレートを「CSV(ヘッダ有)」で新規作成し、<b>見出し名で</b>項目を関連付けます（位置での自動割当はズレの原因になります）。CSVの列はe飛伝の項目順に並べ、空の列も残してあります。「お届け先住所1」「お届け先名称1」の関連付けは必須。品名は全角16文字を超えるとエラーになるため「桁溢れ時にオーバー分を切り捨てて取り込む」にチェックを。文字コードは環境設定に合わせて（既定はUTF-8）。</p>
+  <p>どちらも出力後は取込結果画面でエラーを確認してください。</p>
+</footer>
+</div>
+
+<script>
+"use strict";
+/* ===================== utilities ===================== */
+const $ = (s)=>document.querySelector(s);
+const $$ = (s)=>Array.from(document.querySelectorAll(s));
+
+function store(k, v){
+  try{
+    if(v===undefined) { const r = localStorage.getItem(k); return r===null?null:JSON.parse(r); }
+    localStorage.setItem(k, JSON.stringify(v)); return true;
+  }catch(e){ return v===undefined?null:false; }
+}
+
+/* --- text decoding: UTF-8 first, fall back to Shift_JIS --- */
+function decodeAuto(buf){
+  const u8 = new Uint8Array(buf);
+  if(u8[0]===0xEF && u8[1]===0xBB && u8[2]===0xBF){
+    return new TextDecoder('utf-8').decode(u8.subarray(3));
+  }
+  try{
+    return new TextDecoder('utf-8',{fatal:true}).decode(u8);
+  }catch(e){
+    try{ return new TextDecoder('shift_jis').decode(u8); }
+    catch(e2){ return new TextDecoder('utf-8').decode(u8); }
+  }
+}
+
+/* --- Shift_JIS encoder built from the browser's own decoder --- */
+let SJIS = null;
+function sjisTable(){
+  if(SJIS) return SJIS;
+  const m = new Map();
+  for(let i=0;i<0x80;i++) m.set(String.fromCharCode(i), [i]);
+  const d = new TextDecoder('shift_jis');
+  for(let b=0xA1;b<=0xDF;b++){
+    const s = d.decode(new Uint8Array([b]));
+    if(s && s!=='\uFFFD') m.set(s,[b]);
+  }
+  const pair = new Uint8Array(2);
+  for(let b1=0x81;b1<=0xFC;b1++){
+    if(b1>=0xA0 && b1<=0xDF) continue;
+    for(let b2=0x40;b2<=0xFC;b2++){
+      if(b2===0x7F) continue;
+      pair[0]=b1; pair[1]=b2;
+      const s = d.decode(pair);
+      if(s.length===1 && s!=='\uFFFD' && !m.has(s)) m.set(s,[b1,b2]);
+    }
+  }
+  SJIS = m; return m;
+}
+function encodeSjis(str){
+  const t = sjisTable(); const out = []; let lost = 0;
+  for(const ch of str){
+    const b = t.get(ch);
+    if(b){ out.push.apply(out, b); }
+    else { out.push(0x3F); lost++; }
+  }
+  return {bytes:new Uint8Array(out), lost};
+}
+function encodeUtf8Bom(str){
+  const body = new TextEncoder().encode(str);
+  const out = new Uint8Array(body.length+3);
+  out.set([0xEF,0xBB,0xBF]); out.set(body,3);
+  return {bytes:out, lost:0};
+}
+
+/* --- CSV parse / build --- */
+function parseCSV(text){
+  text = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  const rows=[]; let row=[]; let cur=''; let q=false;
+  for(let i=0;i<text.length;i++){
+    const c = text[i];
+    if(q){
+      if(c === '"'){ if(text[i+1]==='"'){ cur+='"'; i++; } else q=false; }
+      else cur+=c;
+    }else{
+      if(c === '"') q=true;
+      else if(c === ','){ row.push(cur); cur=''; }
+      else if(c === '\n'){ row.push(cur); rows.push(row); row=[]; cur=''; }
+      else cur+=c;
+    }
+  }
+  if(cur!=='' || row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(r=>r.length>1 || (r[0]||'').trim()!=='');
+}
+function csvCell(v){
+  v = (v==null?'':String(v));
+  return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
+}
+function buildCSV(header, rows){
+  const lines = [header.map(csvCell).join(',')];
+  for(const r of rows) lines.push(header.map(h=>csvCell(r[h])).join(','));
+  return lines.join('\r\n')+'\r\n';
+}
+let dlNs; /* undefined = 未解決 / null = 通常のダウンロードを使う */
+async function saveApi(){
+  if(dlNs !== undefined) return dlNs;
+  try{ dlNs = (window.claude && window.claude.use) ? await window.claude.use('downloads') : null; }
+  catch(e){ dlNs = null; }
+  return dlNs;
+}
+async function download(name, bytes){
+  const ns = await saveApi();
+  if(ns){
+    try{ await ns.save({filename:name, data:bytes}); return; }
+    catch(err){
+      if(err && err.code === 'declined') return;
+      alert('ファイルを保存できませんでした：' + ((err && err.message) || 'unknown'));
+      return;
+    }
+  }
+  const blob = new Blob([bytes], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
+/* --- japanese text helpers --- */
+function toHalfAlnum(s){
+  return String(s||'').replace(/[Ａ-Ｚａ-ｚ０-９]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+    .replace(/[‐‑‒–—―ー－]/g,'-').replace(/　/g,' ');
+}
+function cleanTel(s){ return toHalfAlnum(s).replace(/[^0-9\-]/g,'').trim(); }
+function cleanZip(s){
+  const z = toHalfAlnum(s).replace(/[^0-9\-]/g,'');
+  if(/^\d{7}$/.test(z)) return z.slice(0,3)+'-'+z.slice(3);
+  return z;
+}
+const KANA_F2H = (function(){
+  const base = {'ガ':'ｶﾞ','ギ':'ｷﾞ','グ':'ｸﾞ','ゲ':'ｹﾞ','ゴ':'ｺﾞ','ザ':'ｻﾞ','ジ':'ｼﾞ','ズ':'ｽﾞ','ゼ':'ｾﾞ','ゾ':'ｿﾞ','ダ':'ﾀﾞ','ヂ':'ﾁﾞ','ヅ':'ﾂﾞ','デ':'ﾃﾞ','ド':'ﾄﾞ','バ':'ﾊﾞ','ビ':'ﾋﾞ','ブ':'ﾌﾞ','ベ':'ﾍﾞ','ボ':'ﾎﾞ','パ':'ﾊﾟ','ピ':'ﾋﾟ','プ':'ﾌﾟ','ペ':'ﾍﾟ','ポ':'ﾎﾟ','ヴ':'ｳﾞ',
+  'ア':'ｱ','イ':'ｲ','ウ':'ｳ','エ':'ｴ','オ':'ｵ','カ':'ｶ','キ':'ｷ','ク':'ｸ','ケ':'ｹ','コ':'ｺ','サ':'ｻ','シ':'ｼ','ス':'ｽ','セ':'ｾ','ソ':'ｿ','タ':'ﾀ','チ':'ﾁ','ツ':'ﾂ','テ':'ﾃ','ト':'ﾄ','ナ':'ﾅ','ニ':'ﾆ','ヌ':'ﾇ','ネ':'ﾈ','ノ':'ﾉ','ハ':'ﾊ','ヒ':'ﾋ','フ':'ﾌ','ヘ':'ﾍ','ホ':'ﾎ','マ':'ﾏ','ミ':'ﾐ','ム':'ﾑ','メ':'ﾒ','モ':'ﾓ','ヤ':'ﾔ','ユ':'ﾕ','ヨ':'ﾖ','ラ':'ﾗ','リ':'ﾘ','ル':'ﾙ','レ':'ﾚ','ロ':'ﾛ','ワ':'ﾜ','ヲ':'ｦ','ン':'ﾝ',
+  'ァ':'ｧ','ィ':'ｨ','ゥ':'ｩ','ェ':'ｪ','ォ':'ｫ','ッ':'ｯ','ャ':'ｬ','ュ':'ｭ','ョ':'ｮ','ー':'ｰ','、':'､','。':'｡','「':'｢','」':'｣','・':'･','　':' '};
+  return base;
+})();
+function toHalfKana(s){
+  s = String(s||'');
+  // hiragana -> katakana first
+  s = s.replace(/[ぁ-ゖ]/g, c=>String.fromCharCode(c.charCodeAt(0)+0x60));
+  let o='';
+  for(const ch of s) o += (KANA_F2H[ch] !== undefined ? KANA_F2H[ch] : ch);
+  return toHalfAlnum(o);
+}
+function width(s){
+  let n=0;
+  for(const ch of String(s||'')){
+    n += /[\x00-\x7F｡-ﾟ]/.test(ch) ? 1 : 2;
+  }
+  return n;
+}
+function cutW(s, max){
+  let n=0, o='';
+  for(const ch of String(s||'')){
+    const w = /[\x00-\x7F｡-ﾟ]/.test(ch) ? 1 : 2;
+    if(n+w > max) break;
+    n += w; o += ch;
+  }
+  return o;
+}
+function splitW(s, max){
+  s = String(s||'');
+  let a = cutW(s, max);
+  const rest = s.slice(a.length);
+  /* 単語の途中で切れたら、直前の区切りまで戻す（短くなりすぎない範囲で） */
+  if(rest && !/^[\s　]/.test(rest)){
+    const m = a.match(/^([\s\S]*[\s　\/・,、])[^\s　\/・,、]*$/);
+    if(m && width(m[1]) >= max * 0.55) a = m[1];
+  }
+  return [a.trim(), s.slice(a.length).trim()];
+}
+/* 住所を桁数で分ける。番地の数字列の途中では切らない */
+function splitAddr(s, max){
+  s = String(s||'').trim();
+  if(width(s) <= max) return [s, ''];
+  let a = cutW(s, max);
+  const rest = s.slice(a.length);
+  const m = a.match(/^([\s\S]*?)([0-9０-９][0-9０-９\-ー－の丁目番地号]*)$/);
+  if(m && /^[0-9０-９\-ー－]/.test(rest) && width(m[1]) >= max * 0.4){
+    a = m[1];
+  } else {
+    const sp = a.match(/^([\s\S]*[\s　])[^\s　]*$/);
+    if(sp && width(sp[1]) >= max * 0.55) a = sp[1];
+  }
+  return [a.trim(), s.slice(a.length).trim()];
+}
+
+/* 明細セルは「L1=…（改行）L2=…」の形で複数商品が入る */
+function detailValues(v){
+  return String(v||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+}
+const CODE_RE = /[\s　]+([0-9０-９]{4,})\s*$/;
+function pickCode(s){ const m = String(s||'').match(CODE_RE); return m ? toHalfAlnum(m[1]) : ''; }
+function cleanName(s, opt){
+  s = String(s||'').trim();
+  if(opt.L) s = s.replace(/^L\d+\s*=\s*/, '');
+  if(opt.B) s = s.replace(/^\s*[【\[（(][^】\]）)]{0,6}[】\]）)]\s*/, '');
+  if(opt.N) s = s.replace(/[\s　]+[0-9０-９]{4,}\s*$/, '');
+  (opt.words||[]).forEach(wd=>{ if(wd) s = s.split(wd).join(''); });
+  return s.replace(/[\s　]{2,}/g, ' ').trim();
+}
+function today(){
+  const d = new Date();
+  const p = n=>String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+}
+function slash(d){ return String(d||'').replace(/-/g,'/'); }
+function compact(d){ return String(d||'').replace(/-/g,''); }
+
+/* ===================== store presets ===================== */
+const STORE_KEYS = [
+  {k:'ishikawa', n:'石川小松'},
+  {k:'osaka',    n:'大阪'},
+  {k:'yokohama', n:'横浜'},
+  {k:'sachiura', n:'金沢八景（幸浦）'},
+  {k:'other',    n:'その他'}
+];
+const SFIELDS = ['s_name','s_tel','s_zip','s_addr','s_cust','s_fare'];
+let curStore = 'ishikawa';
+/* 固定の依頼主情報。この端末にまだ保存されていない場合に使う既定値 */
+const STORE_DEFAULTS = {
+  ishikawa: {s_name:'PLAYMART石川小松店', s_tel:'076-154-4545', s_zip:'923-0854', s_addr:'石川県小松市大領町ロ32', s_cust:'09051766024', s_fare:'01'}
+};
+
+function loadStores(){
+  const sel = $('#storeSel');
+  sel.innerHTML = STORE_KEYS.map(s=>`<option value="${s.k}">${s.n}</option>`).join('');
+  const p = new URLSearchParams(location.search).get('store');
+  const saved = store('b2conv.lastStore');
+  curStore = (p && STORE_KEYS.some(s=>s.k===p)) ? p : (saved || 'ishikawa');
+  sel.value = curStore;
+  applyStore();
+  sel.addEventListener('change', ()=>{ curStore = sel.value; store('b2conv.lastStore', curStore); applyStore(); });
+}
+function applyStore(){
+  const d = store('b2conv.store.'+curStore) || STORE_DEFAULTS[curStore] || {};
+  SFIELDS.forEach(id=>{ $('#'+id).value = d[id] || ''; });
+  updateStoreSummary();
+}
+function updateStoreSummary(){
+  const sum = $('#storeSummary'); if(!sum) return;
+  const name = $('#s_name').value.trim() || '（未設定）';
+  const parts = [$('#s_tel').value.trim(), $('#s_zip').value.trim(), $('#s_addr').value.trim()].filter(Boolean);
+  sum.querySelector('b').textContent = name + (parts.length ? ' ・ ' + parts.join(' ・ ') : '');
+}
+$('#saveStore') && $('#saveStore').addEventListener('click', ()=>{
+  const d = {}; SFIELDS.forEach(id=> d[id] = $('#'+id).value.trim());
+  const ok = store('b2conv.store.'+curStore, d);
+  const m = $('#saveMsg');
+  m.textContent = ok ? '保存しました' : 'この環境では保存できません（入力は今回のみ有効）';
+  setTimeout(()=>{ m.textContent=''; }, 2600);
+  updateStoreSummary();
+});
+
+/* ===================== tabs ===================== */
+function setTab(n){
+  $('#tab1').setAttribute('aria-selected', n===1);
+  $('#tab2').setAttribute('aria-selected', n===2);
+  $('#mode1').hidden = n!==1;
+  $('#mode2').hidden = n!==2;
+}
+$('#tab1').addEventListener('click', ()=>setTab(1));
+$('#tab2').addEventListener('click', ()=>setTab(2));
+
+/* ===================== file dropzones ===================== */
+function wireDrop(dropId, inputId, infoId, cb){
+  const drop = $('#'+dropId), input = $('#'+inputId), info = $('#'+infoId);
+  const open = ()=>input.click();
+  drop.addEventListener('click', open);
+  drop.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } });
+  ['dragenter','dragover'].forEach(t=>drop.addEventListener(t, e=>{ e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave','drop'].forEach(t=>drop.addEventListener(t, e=>{ e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e=>{ const f = e.dataTransfer.files[0]; if(f) read(f); });
+  input.addEventListener('change', ()=>{ if(input.files[0]) read(input.files[0]); });
+  function read(f){
+    const r = new FileReader();
+    r.onload = ()=>{
+      const rows = parseCSV(decodeAuto(r.result));
+      info.textContent = f.name + ' / ' + Math.max(0, rows.length-1) + '件';
+      drop.classList.add('loaded');
+      cb(rows);
+    };
+    r.readAsArrayBuffer(f);
+  }
+}
+
+/* ===================== MODE 1 ===================== */
+const SRC = [
+  {key:'orderId',  label:'注文番号',        req:true,  cand:['OrderId','注文番号','注文ID','受注番号','OrderID']},
+  {key:'lastName', label:'お届け先 姓',     req:true,  cand:['ShipLastName','お届け先姓','配送先姓','送付先姓','お届け先氏名']},
+  {key:'firstName',label:'お届け先 名',     cand:['ShipFirstName','お届け先名','配送先名','送付先名']},
+  {key:'lastKana', label:'お届け先 姓カナ', cand:['ShipLastNameKana','お届け先姓カナ','配送先姓カナ']},
+  {key:'firstKana',label:'お届け先 名カナ', cand:['ShipFirstNameKana','お届け先名カナ','配送先名カナ']},
+  {key:'zip',      label:'郵便番号',        req:true,  cand:['ShipZipCode','お届け先郵便番号','配送先郵便番号','郵便番号']},
+  {key:'pref',     label:'都道府県',        cand:['ShipPrefecture','お届け先都道府県','都道府県']},
+  {key:'city',     label:'市区町村',        cand:['ShipCity','お届け先市区町村','市区町村']},
+  {key:'addr1',    label:'住所（番地まで）', req:true, cand:['ShipAddress1','お届け先住所1','住所1','配送先住所1']},
+  {key:'addr2',    label:'建物名・部屋番号', cand:['ShipAddress2','お届け先住所2','住所2','建物名','配送先住所2']},
+  {key:'tel',      label:'電話番号',        req:true,  cand:['ShipPhoneNumber','お届け先電話番号','配送先電話番号','電話番号']},
+  {key:'reqDate',  label:'配達希望日',      cand:['ShipRequestDate','お届け希望日','配達希望日']},
+  {key:'reqTime',  label:'配達希望時間帯',  cand:['ShipRequestTime','お届け希望時間','配達希望時間帯']},
+  {key:'itemName', label:'商品名',          cand:['Title','ItemName','商品名','ItemTitle','ItemOption']},
+  {key:'pay',      label:'支払方法',        cand:['PayMethodName','PayMethod','支払方法']},
+  {key:'mail',     label:'メールアドレス',  cand:['BillMailAddress','ShipMailAddress','メールアドレス']},
+  {key:'auctionId',label:'オークションID',   cand:['YahooAuctionId','オークションID','AuctionId','ItemId']},
+  {key:'itemPrice',label:'落札額（保険金額用）', cand:['LineSubTotal','UnitPrice','落札金額','商品代金','落札価格']}
+];
+const B2COLS = ['お客様管理番号','送り状種類','クール区分','出荷予定日','お届け予定（指定）日','配達時間帯',
+  'お届け先電話番号','お届け先郵便番号','お届け先住所','お届け先住所（アパートマンション名）','お届け先名','お届け先名略称カナ','敬称',
+  'ご依頼主電話番号','ご依頼主郵便番号','ご依頼主住所','ご依頼主名','品名1','品名2','荷扱い1','荷扱い2','記事',
+  'ご請求先顧客コード','運賃管理番号','検索キータイトル1','検索キー1','検索キータイトル2','検索キー2'];
+const LIMITS = {
+  'お客様管理番号':20,'お届け先電話番号':15,'お届け先郵便番号':8,'お届け先住所':64,
+  'お届け先住所（アパートマンション名）':32,'お届け先名':32,'お届け先名略称カナ':50,'敬称':4,
+  'ご依頼主電話番号':15,'ご依頼主郵便番号':8,'ご依頼主住所':64,'ご依頼主名':32,'品名1':50,'品名2':50,'荷扱い1':20,'荷扱い2':20,'記事':32
+};
+/* e飛伝Ⅲ本体の項目順に合わせる（位置で自動割当されてもズレないように） */
+const SGCOLS = ['お届け先コード取得区分','お届け先コード',
+  'お届け先電話番号','お届け先郵便番号','お届け先住所1','お届け先住所2','お届け先住所3',
+  'お届け先名称1','お届け先名称2','お客様管理番号',
+  'ご依頼主コード取得区分','ご依頼主コード',
+  'ご依頼主電話番号','ご依頼主郵便番号','ご依頼主住所1','ご依頼主住所2','ご依頼主名称1','ご依頼主名称2',
+  '品名1','品名2','品名3','品名4','品名5',
+  '出荷個数','配達日','配達指定時間帯','保険金額','保険金額印字','出荷日',
+  '指定シール1','指定シール2','指定シール3'];
+/* 空でも必ず書き出す列。ここを空で明示しないとe飛伝側が電話番号などを自動で埋めることがある */
+const SG_ALWAYS = ['お届け先コード取得区分','お届け先コード','ご依頼主コード取得区分','ご依頼主コード',
+  '指定シール1','指定シール2','指定シール3'];
+const SG_LIMITS = {'お客様管理番号':16,'お届け先電話番号':14,'お届け先郵便番号':8,
+  'お届け先住所1':32,'お届け先住所2':32,'お届け先住所3':32,'お届け先名称1':32,'お届け先名称2':32,
+  'ご依頼主電話番号':14,'ご依頼主郵便番号':8,'ご依頼主住所1':32,'ご依頼主住所2':32,
+  'ご依頼主名称1':32,'ご依頼主名称2':32,
+  '品名1':32,'品名2':32,'品名3':32,'品名4':32,'品名5':32,'出荷個数':3,'配達日':8,'配達指定時間帯':2,'保険金額':9,'出荷日':8,
+  '指定シール1':3,'指定シール2':3,'指定シール3':3};
+/* ケアマーク（指定シール）区分値。佐川急便 e飛伝Ⅲ 区分値一覧より */
+const CAREMARK_CODES = {handling:'011', updown:'013'};
+const SG_REQUIRED = ['お届け先電話番号','お届け先郵便番号','お届け先住所1','お届け先名称1',
+  'ご依頼主電話番号','ご依頼主郵便番号','ご依頼主住所1','ご依頼主名称1','出荷個数','出荷日'];
+const REQUIRED = ['送り状種類','出荷予定日','お届け先電話番号','お届け先郵便番号','お届け先住所','お届け先名',
+  'ご依頼主電話番号','ご依頼主郵便番号','ご依頼主住所','ご依頼主名','品名1','ご請求先顧客コード','運賃管理番号'];
+
+let ordersRows = null, mapping = {}, outRows = [], srcRecords = [], skippedCount = 0;
+let outYamato = [], outSagawa = [], viewCarrier = 'yamato';
+let codCount = 0;
+let orderTo = new Map(), eachPending = [];
+
+wireDrop('dropOrders','fileOrders','infoOrders', rows=>{ ordersRows = rows; orderTo = new Map(); buildMapUI(); convert(); });
+
+function guessCol(headers, cands){
+  const norm = s=>String(s||'').trim().toLowerCase().replace(/[\s"']/g,'');
+  const H = headers.map(norm);
+  for(const c of cands){ const i = H.indexOf(norm(c)); if(i>=0) return i; }
+  for(const c of cands){ const n = norm(c); const i = H.findIndex(h=>h && (h.includes(n)||n.includes(h))); if(i>=0) return i; }
+  return -1;
+}
+function buildMapUI(){
+  if(!ordersRows || !ordersRows.length) return;
+  const headers = ordersRows[0];
+  const saved = store('b2conv.map') || {};
+  const list = $('#mapList'); list.innerHTML = '';
+  SRC.forEach(f=>{
+    let idx = (saved[f.key]!==undefined && headers[saved[f.key]]!==undefined) ? saved[f.key] : guessCol(headers, f.cand);
+    mapping[f.key] = idx;
+    const opts = ['<option value="-1">（使わない）</option>']
+      .concat(headers.map((h,i)=>`<option value="${i}"${i===idx?' selected':''}>${escapeHtml(h||('列'+(i+1)))}</option>`));
+    const div = document.createElement('div');
+    div.className = 'maprow';
+    div.innerHTML = `<div class="lbl">${f.label}${f.req?'<span class="req">必須</span>':''}</div><select data-k="${f.key}">${opts.join('')}</select>`;
+    list.appendChild(div);
+  });
+  list.addEventListener('change', e=>{
+    if(e.target.tagName!=='SELECT') return;
+    mapping[e.target.dataset.k] = parseInt(e.target.value,10);
+    store('b2conv.map', mapping);
+    convert();
+  });
+  buildFilterUI(headers);
+
+  const nc = $('#o_nameCol');
+  const savedNC = store('b2conv.nameCol');
+  const guessNC = guessCol(headers, ['TakeOverNote','申し送り事項','申し送り','備考','メモ','コメント','Note','Memo','Remarks']);
+  nc.innerHTML = headers.map((h,i)=>`<option value="${i}">${escapeHtml(h||('列'+(i+1)))}</option>`).join('');
+  nc.value = (savedNC!==null && headers[savedNC]!==undefined) ? savedNC : (guessNC>=0 ? guessNC : 0);
+  const savedNS = store('b2conv.nameSrc');
+  if(savedNS) $('#o_nameSrc').value = savedNS;
+  const savedAuc = store('b2conv.aucTo');
+  if(savedAuc) $('#o_aucTo').value = savedAuc;
+  const savedNum = store('b2conv.numTo');
+  if(savedNum) $('#o_numTo').value = savedNum;
+  syncNameSrc();
+
+  $('#cardMap').hidden = false;
+  $('#cardOpt').hidden = false;
+  $('#cardEmpty').hidden = true;
+  if(!$('#o_date').value) $('#o_date').value = today();
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ---- 配送方法での絞り込み ---- */
+let methodCol = -1, methodTo = null;
+const YAMATO_RE = /ヤマト|宅急便|ネコポス|クロネコ|コンパクト/;
+const SAGAWA_RE = /佐川|飛脚/;
+const EACH_RE = /複数個口|落札後|ご連絡|別途|要相談|未定/;
+function guessCarrier(k){
+  if(YAMATO_RE.test(k)) return 'yamato';
+  if(SAGAWA_RE.test(k)) return 'sagawa';
+  if(EACH_RE.test(k)) return 'each';
+  return 'none';
+}
+const CARRIER_LABEL = {yamato:'ヤマトB2', sagawa:'佐川e飛伝', each:'注文ごと', none:'使わない'};
+function buildFilterUI(headers){
+  methodCol = guessCol(headers, ['ShipMethodName','配送方法','お届け方法','ShipMethod']);
+  const box = $('#filterList');
+  if(methodCol < 0){ $('#cardFilter').hidden = true; methodTo = null; return; }
+  const counts = new Map();
+  for(let i=1;i<ordersRows.length;i++){
+    const v = String((ordersRows[i]||[])[methodCol] || '（未設定）').trim() || '（未設定）';
+    counts.set(v, (counts.get(v)||0) + 1);
+  }
+  const keys = Array.from(counts.keys());
+  const saved = store('b2conv.methodTo') || {};
+  methodTo = new Map();
+  keys.forEach(k=>{ methodTo.set(k, saved[k] || guessCarrier(k)); });
+  $('#btnGuess').onclick = ()=>{ keys.forEach(k=>methodTo.set(k, guessCarrier(k))); syncFilterChecks(); saveMethodTo(); convert(); };
+  $('#btnNone').onclick = ()=>{ keys.forEach(k=>methodTo.set(k, 'none')); syncFilterChecks(); saveMethodTo(); convert(); };
+  box.innerHTML = keys.map(k=>
+    `<div class="maprow">
+      <div class="lbl">${escapeHtml(k)}<br><span class="hint" style="margin:0">${counts.get(k)}件</span></div>
+      <select data-m="${escapeHtml(k)}">
+        <option value="yamato">ヤマトB2クラウドへ</option>
+        <option value="sagawa">佐川e飛伝Ⅲへ</option>
+        <option value="each">注文ごとに決める</option>
+        <option value="none">使わない</option>
+      </select>
+    </div>`).join('');
+  syncFilterChecks();
+  box.onchange = (e)=>{
+    if(e.target.tagName !== 'SELECT') return;
+    methodTo.set(e.target.dataset.m, e.target.value);
+    saveMethodTo(); convert();
+  };
+  $('#cardFilter').hidden = false;
+}
+function renderEachList(){
+  const wrap = $('#eachWrap');
+  if(!eachPending.length){ wrap.hidden = true; return; }
+  wrap.hidden = false;
+  const undecided = eachPending.filter(e=>e.to === 'none').length;
+  $('#eachTable').querySelector('thead').innerHTML =
+    '<tr><th>注文番号</th><th>お届け先</th><th>地域</th><th>商品</th><th>配送方法</th><th>行き先'
+    + (undecided ? '（未指定 '+undecided+'件）' : '') + '</th></tr>';
+  $('#eachTable').querySelector('tbody').innerHTML = eachPending.map(e=>
+    `<tr>
+      <td class="mono">${escapeHtml(e.id)}</td>
+      <td>${escapeHtml(e.name)}</td>
+      <td>${escapeHtml(e.pref)}</td>
+      <td style="white-space:normal;max-width:320px">${escapeHtml(cutW(e.item, 40))}</td>
+      <td>${escapeHtml(e.method)}</td>
+      <td><select data-o="${escapeHtml(e.id)}" style="width:auto;min-width:130px">
+        <option value="none"${e.to==='none'?' selected':''}>未指定</option>
+        <option value="yamato"${e.to==='yamato'?' selected':''}>ヤマトB2</option>
+        <option value="sagawa"${e.to==='sagawa'?' selected':''}>佐川e飛伝Ⅲ</option>
+      </select></td>
+    </tr>`).join('');
+}
+function setAllEach(v){
+  eachPending.forEach(e=>{ if(v === 'none') orderTo.delete(e.id); else orderTo.set(e.id, v); });
+  convert();
+}
+$('#eachTable').addEventListener('change', e=>{
+  if(e.target.tagName !== 'SELECT' || !e.target.dataset.o) return;
+  const v = e.target.value;
+  if(v === 'none') orderTo.delete(e.target.dataset.o); else orderTo.set(e.target.dataset.o, v);
+  convert();
+});
+$('#btnEachY').addEventListener('click', ()=>setAllEach('yamato'));
+$('#btnEachS').addEventListener('click', ()=>setAllEach('sagawa'));
+$('#btnEachN').addEventListener('click', ()=>setAllEach('none'));
+
+function saveMethodTo(){
+  const o = {}; methodTo.forEach((v,k)=>{ o[k]=v; });
+  store('b2conv.methodTo', o);
+}
+function syncFilterChecks(){
+  $$('#filterList select').forEach(sel=>{ sel.value = methodTo.get(sel.dataset.m) || 'none'; });
+}
+
+function syncNameSrc(){
+  $('#wrapNameCol').hidden = $('#o_nameSrc').value !== 'col';
+}
+['o_date','o_kind','o_item','o_hono','o_merge','o_reqdate','o_over','o_nameCol',
+ 'o_multi','o_stripL','o_stripB','o_stripN','o_numTo','o_aucTo','o_dropEmpty','o_hoken','o_hokenP','o_sgCode','o_dropCod','o_caremark'].forEach(id=>{
+  const el = $('#'+id); if(el) el.addEventListener('change', convert);
+});
+$('#o_nameSrc').addEventListener('change', ()=>{ syncNameSrc(); store('b2conv.nameSrc', $('#o_nameSrc').value); convert(); });
+$('#o_nameCol').addEventListener('change', ()=>{ store('b2conv.nameCol', parseInt($('#o_nameCol').value,10)); });
+$('#o_aucTo').addEventListener('change', ()=>{ store('b2conv.aucTo', $('#o_aucTo').value); });
+$('#o_numTo').addEventListener('change', ()=>{ store('b2conv.numTo', $('#o_numTo').value); });
+$('#o_item').addEventListener('input', convert);
+$('#o_strip').addEventListener('input', convert);
+SFIELDS.forEach(id=> $('#'+id).addEventListener('input', ()=>{ updateStoreSummary(); if(ordersRows) convert(); }));
+
+function timeCode(v){
+  const s = toHalfAlnum(String(v||''));
+  if(!s) return '';
+  if(/午前/.test(s)) return '0812';
+  const nums = s.match(/\d{1,2}/g);
+  if(!nums || nums.length<2) return '';
+  const a = parseInt(nums[0],10), b = parseInt(nums[1],10);
+  const key = a+'-'+b;
+  const table = {'8-12':'0812','14-16':'1416','16-18':'1618','18-20':'1820','19-21':'1921','20-21':'1921','9-12':'0812'};
+  return table[key] || '';
+}
+function sgTimeCode(v){
+  const t = toHalfAlnum(String(v||''));
+  if(!t) return '';
+  if(/午前/.test(t)) return '01';
+  const n = t.match(/\d{1,2}/g);
+  if(!n || n.length < 2) return '';
+  const k = parseInt(n[0],10)+'-'+parseInt(n[1],10);
+  return ({'8-12':'01','9-12':'01','12-14':'12','14-16':'14','16-18':'16','18-20':'18','18-21':'18','19-21':'19'})[k] || '';
+}
+function get(r, key){ const i = mapping[key]; return (i>=0 && r[i]!==undefined) ? String(r[i]).trim() : ''; }
+
+function convert(){
+  if(!ordersRows || ordersRows.length<2){ return; }
+  const S = {}; SFIELDS.forEach(id=> S[id] = $('#'+id).value.trim());
+  const shipDate = slash($('#o_date').value);
+  const defKind = $('#o_kind').value;
+  const defItem = $('#o_item').value.trim();
+  const hono = $('#o_hono').value.trim();
+  const useReq = $('#o_reqdate').checked;
+  const items = new Map();
+  const nameSrc = $('#o_nameSrc').value;
+  const nameCol = parseInt($('#o_nameCol').value, 10);
+  const nameOpt = {
+    L: $('#o_stripL').checked,
+    B: $('#o_stripB').checked,
+    N: $('#o_stripN').checked,
+    words: $('#o_strip').value.split(/[,、]/).map(s=>s.trim()).filter(Boolean)
+  };
+
+  skippedCount = 0;
+  codCount = 0;
+  eachPending = [];
+  let recs = [];
+  for(let i=1;i<ordersRows.length;i++){
+    const r = ordersRows[i];
+    if(!r || r.every(c=>String(c||'').trim()==='')) continue;
+    let carrier = 'yamato';
+    if(methodTo && methodCol >= 0){
+      const mv = String(r[methodCol] || '（未設定）').trim() || '（未設定）';
+      carrier = methodTo.get(mv) || 'none';
+      if(carrier === 'each'){
+        const oid = get(r,'orderId');
+        carrier = orderTo.get(oid) || 'none';
+        eachPending.push({
+          id: oid,
+          name: [get(r,'lastName'), get(r,'firstName')].filter(Boolean).join(' '),
+          pref: get(r,'pref') + get(r,'city'),
+          method: mv,
+          item: cleanName(detailValues(get(r,'itemName'))[0] || '', {L:true,B:true,N:false,words:[]}),
+          to: carrier
+        });
+      }
+      if(carrier === 'none'){ skippedCount++; continue; }
+    }
+    const orderId = get(r,'orderId');
+    const name = [get(r,'lastName'), get(r,'firstName')].filter(Boolean).join('　');
+    const kana = toHalfKana([get(r,'lastKana'), get(r,'firstKana')].filter(Boolean).join(' '));
+    const addr = [get(r,'pref'), get(r,'city'), get(r,'addr1')].filter(Boolean).join('');
+    const pay = get(r,'pay');
+    if($('#o_dropCod').checked && /代引|代金引換|コレクト/.test(pay)){ codCount++; continue; }
+    let names;
+    if(nameSrc === 'fixed'){
+      names = [];
+    } else if(nameSrc === 'col'){
+      names = (nameCol >= 0 && r[nameCol] !== undefined) ? detailValues(r[nameCol]) : [];
+    } else {
+      names = items.get(orderId) || detailValues(get(r,'itemName'));
+    }
+    const codes = [];
+    names = names.map(n=>{
+      let s = cleanName(n, {L:nameOpt.L, B:nameOpt.B, N:false, words:[]});
+      if(nameOpt.N){
+        const c = pickCode(s);
+        if(c){ codes.push(c); s = s.replace(CODE_RE, ''); }
+      }
+      nameOpt.words.forEach(wd=>{ if(wd) s = s.split(wd).join(''); });
+      return s.replace(/[\s　]{2,}/g, ' ').trim();
+    }).filter(Boolean);
+    recs.push({
+      orderId, name, kana, addr,
+      bld: get(r,'addr2'),
+      tel: cleanTel(get(r,'tel')),
+      zip: cleanZip(get(r,'zip')),
+      reqDate: useReq ? slash(toHalfAlnum(get(r,'reqDate')).replace(/[年月]/g,'/').replace(/日/g,'')) : '',
+      reqTime: useReq ? timeCode(get(r,'reqTime')) : '',
+      reqTimeRaw: useReq ? get(r,'reqTime') : '',
+      kind: defKind,
+      pay: pay,
+      carrier: carrier,
+      names: names,
+      codes: codes,
+      auc: toHalfAlnum(get(r,'auctionId')).replace(/^AUCTION/i,'').trim(),
+      price: detailValues(get(r,'itemPrice'))
+        .map(v=>parseInt(toHalfAlnum(v).replace(/^L\d+\s*=\s*/,'').replace(/[^0-9]/g,''),10) || 0)
+        .reduce((a,b)=>a+b, 0),
+      mail: get(r,'mail')
+    });
+  }
+
+  if($('#o_merge').checked){
+    const g = new Map();
+    for(const rec of recs){
+      const k = rec.zip+'|'+rec.tel+'|'+rec.name;
+      if(!g.has(k)) g.set(k, Object.assign({}, rec, {ids:[rec.orderId], names:rec.names.slice(), codes:(rec.codes||[]).slice(), aucs:[rec.auc]}));
+      else{
+        const t = g.get(k);
+        t.ids.push(rec.orderId);
+        t.names = t.names.concat(rec.names);
+        t.codes = (t.codes||[]).concat(rec.codes||[]);
+        t.price = (t.price||0) + (rec.price||0);
+        t.aucs = (t.aucs||[t.auc]).concat([rec.auc]);
+      }
+    }
+    recs = Array.from(g.values());
+  } else {
+    recs.forEach(r=> r.ids = [r.orderId]);
+  }
+
+  srcRecords = recs;
+  const yRecs = recs.filter(r=>r.carrier === 'yamato');
+  const sRecs = recs.filter(r=>r.carrier === 'sagawa');
+  const ctx = {S, shipDate, hono, defItem};
+  outYamato = yRecs.map(rec=>toB2Row(rec, ctx));
+  outSagawa = sRecs.map(rec=>toSagawaRow(rec, ctx));
+  outRows = (viewCarrier === 'sagawa') ? outSagawa : outYamato;
+  renderEachList();
+  render();
+}
+
+/* 品名の組み立て（両社共通） */
+function joinNames(rec, defItem){
+  let hin = rec.names.length ? rec.names[0] : defItem;
+  if(rec.names.length > 1){
+    hin = ($('#o_multi').value === 'all')
+      ? rec.names.join(' / ')
+      : rec.names[0] + ' 他' + (rec.names.length-1) + '点';
+  }
+  return hin || defItem;
+}
+function extraTags(rec){
+  const codeList = Array.from(new Set(rec.codes || []));
+  const aucList = Array.from(new Set((rec.aucs || [rec.auc]).filter(Boolean)));
+  return {
+    codes: codeList,
+    aucs: aucList,
+    numTo: $('#o_numTo').value,
+    aucTo: $('#o_aucTo').value
+  };
+}
+
+function toB2Row(rec, ctx){
+  const {S, shipDate, hono, defItem} = ctx;
+  const hin = joinNames(rec, defItem);
+  let hin1 = hin, hin2 = '';
+  if(width(hin) > 50){
+    const over = $('#o_over').value;
+    if(over === 'split'){ const p = splitW(hin, 50); hin1 = p[0]; hin2 = cutW(p[1], 50); }
+    else if(over === 'cut'){ hin1 = cutW(hin, 50); }
+  }
+  const o = {};
+  B2COLS.forEach(c=> o[c]='');
+  o['支払方法'] = rec.pay || '';   /* 出力列ではない。代引検知の警告用 */
+  o['お客様管理番号'] = rec.ids[0];
+  o['送り状種類'] = rec.kind;
+  o['出荷予定日'] = shipDate;
+  o['お届け予定（指定）日'] = rec.reqDate;
+  o['配達時間帯'] = rec.reqTime;
+  o['お届け先電話番号'] = rec.tel;
+  o['お届け先郵便番号'] = rec.zip;
+  o['お届け先住所'] = rec.addr;
+  o['お届け先住所（アパートマンション名）'] = rec.bld;
+  o['お届け先名'] = rec.name;
+  o['お届け先名略称カナ'] = rec.kana;
+  o['敬称'] = hono;
+  o['ご依頼主電話番号'] = S.s_tel;
+  o['ご依頼主郵便番号'] = S.s_zip;
+  o['ご依頼主住所'] = S.s_addr;
+  o['ご依頼主名'] = S.s_name;
+  o['品名1'] = hin1;
+  o['品名2'] = hin2;
+  const codeList = Array.from(new Set(rec.codes || []));
+  const numTo = $('#o_numTo').value;
+  let kiji = rec.ids.length>1 ? ('同梱 '+rec.ids.length+'件') : '';
+  const aucList = Array.from(new Set((rec.aucs || [rec.auc]).filter(Boolean)));
+  const aucTo = $('#o_aucTo').value;
+  if(codeList.length && numTo === 'note') kiji = cutW([codeList.join(' '), kiji].filter(Boolean).join(' '), 32);
+  if(aucList.length && aucTo === 'note') kiji = cutW([kiji, aucList.join(' ')].filter(Boolean).join(' '), 32);
+  if(aucList.length && aucTo === 'nimo') o['荷扱い1'] = cutW(aucList.join(' '), 20);
+  if(aucList.length && aucTo === 'key'){ o['検索キータイトル2'] = 'オークションID'; o['検索キー2'] = aucList.join(' '); }
+  if(codeList.length && numTo === 'name2'){ hin2 = cutW([hin2, codeList.join(' ')].filter(Boolean).join(' '), 50); o['品名2'] = hin2; }
+  o['記事'] = kiji;
+  o['ご請求先顧客コード'] = S.s_cust;
+  o['運賃管理番号'] = S.s_fare;
+  o['検索キータイトル1'] = '注文番号';
+  o['検索キー1'] = rec.ids.join(' ');
+  return o;
+}
+
+
+function toSagawaRow(rec, ctx){
+  const {S, shipDate, defItem} = ctx;
+  const o = {};
+  SGCOLS.forEach(c=> o[c]='');
+  o['お届け先コード取得区分'] = $('#o_sgCode').value;
+  o['お届け先コード'] = '';
+  o['ご依頼主コード取得区分'] = '';
+  o['ご依頼主コード'] = '';
+  o['お客様管理番号'] = cutW(rec.ids[0], 16);
+  o['お届け先電話番号'] = rec.tel;
+  o['お届け先郵便番号'] = rec.zip;
+  /* 住所は全角16文字ずつ3欄に分ける */
+  const full = [rec.addr, rec.bld].filter(Boolean).join(' ');
+  const a1 = splitAddr(full, 32);
+  const a2 = splitAddr(a1[1], 32);
+  o['お届け先住所1'] = a1[0];
+  o['お届け先住所2'] = a2[0];
+  o['お届け先住所3'] = cutW(a2[1], 32);
+  const n1 = splitW(rec.name, 32);
+  o['お届け先名称1'] = n1[0];
+  o['お届け先名称2'] = cutW(n1[1], 32);
+  o['ご依頼主電話番号'] = S.s_tel;
+  o['ご依頼主郵便番号'] = S.s_zip;
+  const s1 = splitAddr(S.s_addr, 32);
+  o['ご依頼主住所1'] = s1[0];
+  o['ご依頼主住所2'] = cutW(s1[1], 32);
+  const m1 = splitW(S.s_name, 32);
+  o['ご依頼主名称1'] = m1[0];
+  o['ご依頼主名称2'] = cutW(m1[1], 32);
+  /* 品名は全角16文字ずつ最大5欄。管理番号とオークションIDは最後の欄に載せる */
+  const tag = extraTags(rec);
+  /* 管理番号とオークションIDは1本の文字列に混ぜず、別々の品名欄に分けて載せる */
+  const tailParts = [
+    tag.numTo !== 'drop' ? tag.codes.join(' ') : '',
+    tag.aucTo !== 'drop' ? tag.aucs.join(' ') : ''
+  ].filter(Boolean);
+  let rest = joinNames(rec, defItem);
+  const slots = [];
+  for(let i=0; i<5 && rest; i++){ const pp = splitW(rest, 32); slots.push(pp[0]); rest = pp[1]; }
+  tailParts.forEach(part=>{
+    if(slots.length < 5) slots.push(cutW(part, 32));
+    else slots[4] = cutW(slots[4] + ' ' + part, 32); /* 5欄使い切ったときだけ最後の欄に同居 */
+  });
+  slots.forEach((v,i)=>{ o['品名'+(i+1)] = v; });
+  o['出荷個数'] = '1';
+  o['支払方法'] = rec.pay || '';   /* 出力列ではない。代引検知の警告用 */
+  o['配達日'] = compact(rec.reqDate).replace(/[^0-9]/g,'');
+  o['配達指定時間帯'] = sgTimeCode(rec.reqTimeRaw);
+  if($('#o_hoken').checked && rec.price){
+    o['保険金額'] = String(rec.price);
+    o['保険金額印字'] = $('#o_hokenP').value;
+  }
+  o['出荷日'] = compact(shipDate).replace(/[^0-9]/g,'');
+  if($('#o_caremark').checked){
+    o['指定シール1'] = CAREMARK_CODES.handling; /* 取扱注意 */
+    o['指定シール2'] = CAREMARK_CODES.updown;   /* 天地無用 */
+  }
+  return o;
+}
+
+function checkRow(o, carrier){
+  carrier = carrier || viewCarrier;
+  const bad = {};
+  if(/代引|代金引換|コレクト/.test(o['支払方法']||'')){
+    bad['支払方法'] = {lvl:'bad', msg:'代引の注文です。コレクト非対応のため、この行は除いて別途手配してください'};
+  }
+  const req = carrier === 'sagawa' ? SG_REQUIRED : REQUIRED;
+  const lim = carrier === 'sagawa' ? SG_LIMITS : LIMITS;
+  req.forEach(c=>{ if(!String(o[c]||'').trim()) bad[c] = {lvl:'bad', msg:'必須が空です'}; });
+  for(const c in lim){
+    const w = width(o[c]);
+    if(w > lim[c]) bad[c] = {lvl:'bad', msg:'長すぎます（'+w+'/'+lim[c]+'）'};
+  }
+  if(o['お届け先電話番号'] && !/^[0-9\-]{10,16}$/.test(o['お届け先電話番号'])) bad['お届け先電話番号'] = {lvl:'bad', msg:'電話番号の形式が不正'};
+  if(o['お届け先郵便番号'] && !/^\d{3}-?\d{4}$/.test(o['お届け先郵便番号'])) bad['お届け先郵便番号'] = {lvl:'bad', msg:'郵便番号の形式が不正'};
+  if(carrier === 'sagawa'){
+    if(o['出荷日'] && !/^\d{8}$/.test(o['出荷日'])) bad['出荷日'] = {lvl:'bad', msg:'YYYYMMDD形式にしてください'};
+    if(o['配達日'] && !/^\d{8}$/.test(o['配達日'])) bad['配達日'] = {lvl:'warn', msg:'YYYYMMDD形式を確認してください'};
+    if(o['配達指定時間帯']) bad['配達指定時間帯'] = {lvl:'warn', msg:'e飛伝の時間帯設定（5時間帯/6時間帯）でコードが変わります。初回に確認を'};
+    return bad;
+  }
+  if(o['出荷予定日'] && !/^\d{4}\/\d{2}\/\d{2}$/.test(o['出荷予定日'])) bad['出荷予定日'] = {lvl:'bad', msg:'YYYY/MM/DD形式にしてください'};
+  if(o['お届け予定（指定）日'] && !/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(o['お届け予定（指定）日'])) bad['お届け予定（指定）日'] = {lvl:'warn', msg:'日付形式を確認してください'};
+  if(!o['お届け先住所（アパートマンション名）'] && /\d[-ー－]\d/.test(o['お届け先住所']) === false && width(o['お届け先住所'])<8)
+    bad['お届け先住所'] = {lvl:'warn', msg:'住所が短すぎるかもしれません'};
+  return bad;
+}
+
+let activeCols = B2COLS.slice();
+function colsFor(carrier){ return carrier === 'sagawa' ? SGCOLS : B2COLS; }
+function reqFor(carrier){ return carrier === 'sagawa' ? SG_REQUIRED : REQUIRED; }
+function alwaysFor(carrier){ return carrier === 'sagawa' ? SG_ALWAYS : []; }
+function computeActiveCols(){
+  const all = colsFor(viewCarrier);
+  /* 佐川は項目順が意味を持つため、空でも列を落とさない */
+  if(viewCarrier === 'sagawa' || !$('#o_dropEmpty').checked) return all.slice();
+  const keep = new Set(reqFor(viewCarrier).concat(alwaysFor(viewCarrier)));
+  outRows.forEach(o=>{
+    const bad = checkRow(o, viewCarrier);
+    all.forEach(c=>{ if(String(o[c]||'').trim() !== '' || bad[c]) keep.add(c); });
+  });
+  return all.filter(c=>keep.has(c));
+}
+function render(){
+  activeCols = computeActiveCols();
+  const thead = $('#prevTable thead'), tbody = $('#prevTable tbody');
+  thead.innerHTML = '<tr><th>#</th>' + activeCols.map(c=>'<th>'+escapeHtml(c)+'</th>').join('') + '</tr>';
+  const frag = document.createDocumentFragment();
+  let errN = 0, warnN = 0; const msgs = [];
+  outRows.forEach((o, i)=>{
+    const bad = checkRow(o, viewCarrier);
+    let hasE = false, hasW = false;
+    for(const k in bad){ if(bad[k].lvl==='bad'){ hasE = true; } else hasW = true; }
+    if(hasE) errN++; if(hasW && !hasE) warnN++;
+    if(i < 200){
+      const tr = document.createElement('tr');
+      let html = '<td class="idx">'+(i+1)+'</td>';
+      activeCols.forEach(c=>{
+        const b = bad[c];
+        html += '<td contenteditable="true" data-r="'+i+'" data-c="'+escapeHtml(c)+'"'+(b?' class="'+(b.lvl==='bad'?'bad':'warn')+'" title="'+escapeHtml(b.msg)+'"':'')+'>'+escapeHtml(o[c])+'</td>';
+      });
+      tr.innerHTML = html;
+      frag.appendChild(tr);
+    }
+    if(Object.keys(bad).length && msgs.length < 40){
+      for(const k in bad) msgs.push({i:i+1, c:k, lvl:bad[k].lvl, m:bad[k].msg, id:o['お客様管理番号']});
+    }
+  });
+  tbody.innerHTML = ''; tbody.appendChild(frag);
+
+  const st = $('#statusBar');
+  st.innerHTML = '<span class="pill">'+outRows.length+'件</span>'
+    + (skippedCount ? '<span class="pill">対象外 '+skippedCount+'件</span>' : '')
+    + (codCount ? '<span class="pill err">代引 '+codCount+'件を除外</span>' : '')
+    + (activeCols.length < colsFor(viewCarrier).length ? '<span class="pill">'+activeCols.length+'列（空の'+(colsFor(viewCarrier).length-activeCols.length)+'列を省略）</span>' : '')
+    + (errN ? '<span class="pill err">要修正 '+errN+'件</span>' : '<span class="pill ok">エラーなし</span>')
+    + (warnN ? '<span class="pill warn">確認 '+warnN+'件</span>' : '');
+  const box = $('#msgBox');
+  if(msgs.length){
+    box.hidden = false;
+    $('#msgs').innerHTML = msgs.map(m=>
+      '<li><span class="'+(m.lvl==='bad'?'tagE':'tagW')+'">'+(m.lvl==='bad'?'要修正':'確認')+'</span>'
+      +'<b>'+m.i+'行目'+(m.id?' / '+escapeHtml(m.id):'')+'</b> ｜ '+escapeHtml(m.c)+' … '+escapeHtml(m.m)+'</li>').join('');
+  } else box.hidden = true;
+
+  $('#cardPrev').hidden = false;
+  $('#dlB2').disabled = outYamato.length === 0;
+  $('#dlSG').disabled = outSagawa.length === 0;
+  $('#dlB2').textContent = 'ヤマトB2用CSV' + (outYamato.length ? '（'+outYamato.length+'件）' : '');
+  $('#dlSG').textContent = '佐川e飛伝用CSV' + (outSagawa.length ? '（'+outSagawa.length+'件）' : '');
+  $('#viewY').style.borderColor = viewCarrier === 'yamato' ? 'var(--accent)' : 'var(--rule)';
+  $('#viewS').style.borderColor = viewCarrier === 'sagawa' ? 'var(--accent)' : 'var(--rule)';
+  $('#viewY').style.color = viewCarrier === 'yamato' ? 'var(--accent)' : 'var(--muted)';
+  $('#viewS').style.color = viewCarrier === 'sagawa' ? 'var(--accent)' : 'var(--muted)';
+}
+$('#prevTable').addEventListener('input', e=>{
+  const td = e.target;
+  if(!td.dataset || td.dataset.r===undefined) return;
+  outRows[+td.dataset.r][td.dataset.c] = td.textContent;
+});
+$('#prevTable').addEventListener('blur', e=>{
+  const td = e.target;
+  if(!td.dataset || td.dataset.r===undefined) return;
+  const i = +td.dataset.r, o = outRows[i], bad = checkRow(o);
+  const tr = td.parentElement;
+  Array.from(tr.children).forEach(cell=>{
+    if(cell.dataset.c===undefined) return;
+    const b = bad[cell.dataset.c];
+    cell.className = b ? (b.lvl==='bad'?'bad':'warn') : '';
+    if(b) cell.title = b.msg; else cell.removeAttribute('title');
+  });
+}, true);
+
+function encodeBy(sel, text){
+  return sel === 'sjis' ? encodeSjis(text) : encodeUtf8Bom(text);
+}
+function switchView(c){
+  if(viewCarrier === c) return;
+  viewCarrier = c;
+  outRows = (c === 'sagawa') ? outSagawa : outYamato;
+  $('#o_enc').value = (c === 'sagawa') ? 'utf8' : 'sjis';
+  render();
+}
+$('#viewY').addEventListener('click', ()=>switchView('yamato'));
+$('#viewS').addEventListener('click', ()=>switchView('sagawa'));
+
+function writeCsv(carrier, rows, name){
+  if(!rows.length) return;
+  const all = colsFor(carrier);
+  let cols = all;
+  if(carrier !== 'sagawa' && $('#o_dropEmpty').checked){
+    const keep = new Set(reqFor(carrier).concat(alwaysFor(carrier)));
+    rows.forEach(o=>{ const bad = checkRow(o, carrier);
+      all.forEach(c=>{ if(String(o[c]||'').trim() !== '' || bad[c]) keep.add(c); }); });
+    cols = all.filter(c=>keep.has(c));
+  }
+  const enc = encodeBy($('#o_enc').value, buildCSV(cols, rows));
+  if(enc.lost) alert('選んだ文字コードに変換できない文字が '+enc.lost+' 文字あり「?」に置き換えました。該当箇所を確認してください。');
+  download(name, enc.bytes);
+}
+$('#dlB2').addEventListener('click', ()=>{
+  writeCsv('yamato', outYamato, 'yamato_b2_'+compact($('#o_date').value||today())+'.csv');
+});
+$('#dlSG').addEventListener('click', ()=>{
+  writeCsv('sagawa', outSagawa, 'sagawa_ehiden_'+compact($('#o_date').value||today())+'.csv');
+});
+$('#dlMap').addEventListener('click', ()=>{
+  const rows = srcRecords.map((r,i)=>({'お客様管理番号':outRows[i]['お客様管理番号'],'注文番号':r.ids.join(' '),'お届け先名':r.name}));
+  const text = buildCSV(['お客様管理番号','注文番号','お届け先名'], rows);
+  download('order_map_'+compact(today())+'.csv', encodeUtf8Bom(text).bytes);
+});
+
+/* ===================== MODE 2 ===================== */
+let b2Rows = null;
+wireDrop('dropB2','fileB2','infoB2', rows=>{
+  b2Rows = rows;
+  const h = rows[0] || [];
+  const fill = (sel, cands)=>{
+    const idx = guessCol(h, cands);
+    sel.innerHTML = h.map((c,i)=>`<option value="${i}"${i===idx?' selected':''}>${escapeHtml(c||('列'+(i+1)))}</option>`).join('');
+  };
+  fill($('#b2_order'), ['お客様管理番号','注文番号','OrderId']);
+  fill($('#b2_inv'), ['伝票番号','送り状番号','お問い合わせ伝票番号','お問い合せ送り状No.','お問い合わせ番号','お問い合せ送り状NO']);
+  if(!$('#b2_date').value) $('#b2_date').value = today();
+  $('#cardB2Map').hidden = false;
+  $('#cardB2Empty').hidden = true;
+  renderB2();
+});
+['b2_order','b2_inv','b2_date','b2_status','b2_company','b2_headers'].forEach(id=>{
+  const el = $('#'+id); if(el) el.addEventListener('change', renderB2);
+});
+function renderB2(){
+  if(!b2Rows || b2Rows.length<2) return;
+  const oi = parseInt($('#b2_order').value,10), ii = parseInt($('#b2_inv').value,10);
+  const headers = $('#b2_headers').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const status = $('#b2_status').value, comp = $('#b2_company').value, date = compact($('#b2_date').value);
+  const rows = []; let miss = 0;
+  for(let i=1;i<b2Rows.length;i++){
+    const r = b2Rows[i]; if(!r) continue;
+    const id = String(r[oi]||'').trim(), inv = String(r[ii]||'').trim().replace(/[^0-9\-]/g,'');
+    if(!id) continue;
+    if(!inv) miss++;
+    const o = {};
+    headers.forEach(h=>{
+      if(/OrderId|注文番号/i.test(h)) o[h] = id;
+      else if(/ShipInvoiceNumber|伝票/i.test(h)) o[h] = inv;
+      else if(/ShipStatus|出荷ステータス/i.test(h)) o[h] = status;
+      else if(/ShipCompanyCode|配送会社/i.test(h)) o[h] = comp;
+      else if(/ShipDate|出荷日/i.test(h)) o[h] = date;
+      else o[h] = '';
+    });
+    rows.push(o);
+  }
+  window.__shipRows = {headers, rows};
+  const thead = $('#b2Table thead'), tbody = $('#b2Table tbody');
+  thead.innerHTML = '<tr><th>#</th>'+headers.map(h=>'<th>'+escapeHtml(h)+'</th>').join('')+'</tr>';
+  tbody.innerHTML = rows.slice(0,200).map((o,i)=>
+    '<tr><td class="idx">'+(i+1)+'</td>'+headers.map(h=>'<td'+(!o[h]&&/Invoice|伝票/i.test(h)?' class="bad"':'')+'>'+escapeHtml(o[h])+'</td>').join('')+'</tr>'
+  ).join('');
+  $('#b2Status').innerHTML = '<span class="pill">'+rows.length+'件</span>'
+    + (miss ? '<span class="pill err">伝票番号なし '+miss+'件</span>' : '<span class="pill ok">全件そろっています</span>');
+  $('#cardB2Prev').hidden = false;
+}
+$('#dlShip').addEventListener('click', ()=>{
+  const d = window.__shipRows; if(!d) return;
+  const text = buildCSV(d.headers, d.rows);
+  const enc = encodeBy($('#b2_enc').value, text);
+  download('ship_result_'+compact(today())+'.csv', enc.bytes);
+});
+
+/* ===================== test hook (jsdom回帰テスト用) ===================== */
+window.__b2 = {
+  B2COLS, LIMITS, REQUIRED, SRC,
+  get outRows(){ return outRows; },
+  get srcRecords(){ return srcRecords; },
+  parseCSV, buildCSV, encodeSjis, encodeUtf8Bom, decodeAuto,
+  cleanName, pickCode, splitW, splitAddr, cutW, detailValues,
+  get activeCols(){ return activeCols; },
+  get outYamato(){ return outYamato; },
+  get outSagawa(){ return outSagawa; },
+  SGCOLS, SG_LIMITS, SG_REQUIRED, sgTimeCode, switchView,
+  get codCount(){ return codCount; },
+  get eachPending(){ return eachPending; }, get orderTo(){ return orderTo; },
+  width, cleanTel, cleanZip, toHalfKana, timeCode, checkRow, convert
+};
+
+/* ===================== init ===================== */
+loadStores();
+$('#o_date').value = today();
+$('#b2_date').value = today();
+</script>
+</body>
+</html>
