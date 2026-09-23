@@ -375,12 +375,14 @@ footer.foot{max-width:1180px;margin:0 auto;padding:24px 18px 0;border-top:1px so
         <button class="ghost" id="viewY" style="border-radius:6px 0 0 6px">ヤマト</button>
         <button class="ghost" id="viewS" style="border-radius:0 6px 6px 0">佐川</button>
       </span>
+      <button class="ghost" id="btnDelDup" hidden style="margin-left:10px">重複候補をまとめて削除</button>
+      <button class="ghost" id="btnUndoDel" hidden style="margin-left:6px">削除を元に戻す</button>
       <span class="sub"><span class="status" id="statusBar"></span></span>
     </div>
     <div id="msgBox" class="bd" hidden><ul class="msgs" id="msgs"></ul></div>
     <div class="tablewrap"><table id="prevTable"><thead></thead><tbody></tbody></table></div>
     <div class="bd" style="border-top:1px solid var(--rule-soft)">
-      <p class="hint" style="margin-top:0">セルを直接クリックして修正できます。修正するとその行だけ再チェックされます。表示は先頭200行ですが、書き出しは全件です。</p>
+      <p class="hint" style="margin-top:0">セルを直接クリックして修正できます。行の右端の「削除」でその行を書き出し対象から外せます（郵便番号・電話番号・品名1が同じ行は「重複?」と表示されます）。表示は先頭200行ですが、書き出しは全件です。</p>
       <div class="row">
         <label class="f" style="width:auto"><span>文字コード</span>
           <select id="o_enc" style="width:auto"><option value="sjis">Shift_JIS（推奨）</option><option value="utf8">UTF-8（BOM付き）</option></select>
@@ -649,6 +651,33 @@ function splitAddr(s, max){
   }
   return [a.trim(), s.slice(a.length).trim()];
 }
+/* 佐川e飛伝Ⅲの品名欄用：半角と全角を同じ欄の中で混在させない。
+   1つの欄内で半角→全角のように種類が変わると、印字時にその欄全体が
+   全角換算されてしまい、桁数オーバーの原因になるため、半角のかたまり・
+   全角のかたまりごとに欄を分ける（欄の余りは埋めず、種類が変わったら次の欄へ） */
+function splitHalfFullRuns(s, max){
+  s = String(s||'').trim();
+  if(!s) return [];
+  const runs = [];
+  for(const ch of s){
+    const isSpace = ch===' ' || ch==='　';
+    const half = /[\x00-\x7F｡-ﾟ]/.test(ch);
+    const last = runs[runs.length-1];
+    /* 空白は前後どちらの種類にもなじむので、区切りを作らず直前のかたまりに含める */
+    if(last && (isSpace || last.half === half)) last.t += ch;
+    else runs.push({t: ch, half});
+  }
+  const slots = [];
+  runs.forEach(run=>{
+    let t = run.t;
+    while(t){
+      const piece = cutW(t, max) || t.slice(0,1); /* 1文字がmaxを超えることはない想定の保険 */
+      slots.push(piece);
+      t = t.slice(piece.length);
+    }
+  });
+  return slots.map(x=>x.trim()).filter(Boolean);
+}
 
 /* 明細セルは「L1=…（改行）L2=…」の形で複数商品が入る */
 function detailValues(v){
@@ -824,9 +853,17 @@ const REQUIRED = ['送り状種類','出荷予定日','お届け先電話番号'
 let ordersRows = null, mapping = {}, outRows = [], srcRecords = [], skippedCount = 0;
 let outYamato = [], outSagawa = [], viewCarrier = 'yamato';
 let codCount = 0;
-let orderTo = new Map(), eachPending = [];
+let orderTo = new Map(), orderQty = new Map(), eachPending = [];
+/* プレビューでの「削除」（重複などを除く）: 注文番号の組み合わせで除外を覚えておく。
+   設定を変えて再変換しても消した行が戻ってこないようにする */
+let excludedRows = new Set(), deletedStack = [];
+function rowKey(carrier, ids){ return carrier + '|' + (ids||[]).join(','); }
 
-wireDrop('dropOrders','fileOrders','infoOrders', rows=>{ ordersRows = rows; orderTo = new Map(); buildMapUI(); convert(); });
+wireDrop('dropOrders','fileOrders','infoOrders', rows=>{
+  ordersRows = rows; orderTo = new Map(); orderQty = new Map();
+  excludedRows = new Set(); deletedStack = [];
+  buildMapUI(); convert();
+});
 
 function guessCol(headers, cands){
   const norm = s=>String(s||'').trim().toLowerCase().replace(/[\s"']/g,'');
@@ -946,7 +983,7 @@ function renderEachList(){
   const undecided = eachPending.filter(e=>e.to === 'none').length;
   $('#eachTable').querySelector('thead').innerHTML =
     '<tr><th>注文番号</th><th>お届け先</th><th>地域</th><th>商品</th><th>配送方法</th><th>行き先'
-    + (undecided ? '（未指定 '+undecided+'件）' : '') + '</th></tr>';
+    + (undecided ? '（未指定 '+undecided+'件）' : '') + '</th><th>個口数<span class="hint" style="margin:0">（佐川のみ）</span></th></tr>';
   $('#eachTable').querySelector('tbody').innerHTML = eachPending.map(e=>
     `<tr>
       <td class="mono">${escapeHtml(e.id)}</td>
@@ -959,6 +996,7 @@ function renderEachList(){
         <option value="yamato"${e.to==='yamato'?' selected':''}>ヤマトB2</option>
         <option value="sagawa"${e.to==='sagawa'?' selected':''}>佐川e飛伝Ⅲ</option>
       </select></td>
+      <td><input type="number" min="1" step="1" data-qty="${escapeHtml(e.id)}" value="${e.qty||1}" style="width:64px"></td>
     </tr>`).join('');
 }
 function setAllEach(v){
@@ -966,10 +1004,16 @@ function setAllEach(v){
   convert();
 }
 $('#eachTable').addEventListener('change', e=>{
-  if(e.target.tagName !== 'SELECT' || !e.target.dataset.o) return;
-  const v = e.target.value;
-  if(v === 'none') orderTo.delete(e.target.dataset.o); else orderTo.set(e.target.dataset.o, v);
-  convert();
+  const t = e.target;
+  if(t.tagName === 'SELECT' && t.dataset.o){
+    const v = t.value;
+    if(v === 'none') orderTo.delete(t.dataset.o); else orderTo.set(t.dataset.o, v);
+    convert();
+  } else if(t.tagName === 'INPUT' && t.dataset.qty){
+    const n = Math.max(1, parseInt(t.value, 10) || 1);
+    orderQty.set(t.dataset.qty, n);
+    convert();
+  }
 });
 $('#btnEachY').addEventListener('click', ()=>setAllEach('yamato'));
 $('#btnEachS').addEventListener('click', ()=>setAllEach('sagawa'));
@@ -1058,7 +1102,8 @@ function convert(){
           pref: get(r,'pref') + get(r,'city'),
           method: mv,
           item: cleanName(detailValues(get(r,'itemName'))[0] || '', {L:true,B:true,N:false,words:[]}),
-          to: carrier
+          to: carrier,
+          qty: orderQty.get(oid) || 1
         });
       }
       if(carrier === 'none'){ skippedCount++; continue; }
@@ -1104,7 +1149,8 @@ function convert(){
       price: detailValues(get(r,'itemPrice'))
         .map(v=>parseInt(toHalfAlnum(v).replace(/^L\d+\s*=\s*/,'').replace(/[^0-9]/g,''),10) || 0)
         .reduce((a,b)=>a+b, 0),
-      mail: get(r,'mail')
+      mail: get(r,'mail'),
+      qty: orderQty.get(orderId) || 1
     });
   }
 
@@ -1120,6 +1166,7 @@ function convert(){
         t.codes = (t.codes||[]).concat(rec.codes||[]);
         t.price = (t.price||0) + (rec.price||0);
         t.aucs = (t.aucs||[t.auc]).concat([rec.auc]);
+        t.qty = (t.qty||1) + (rec.qty||1);
       }
     }
     recs = Array.from(g.values());
@@ -1128,8 +1175,8 @@ function convert(){
   }
 
   srcRecords = recs;
-  const yRecs = recs.filter(r=>r.carrier === 'yamato');
-  const sRecs = recs.filter(r=>r.carrier === 'sagawa');
+  const yRecs = recs.filter(r=>r.carrier === 'yamato' && !excludedRows.has(rowKey('yamato', r.ids)));
+  const sRecs = recs.filter(r=>r.carrier === 'sagawa' && !excludedRows.has(rowKey('sagawa', r.ids)));
   const ctx = {S, shipDate, hono, defItem};
   outYamato = yRecs.map(rec=>toB2Row(rec, ctx));
   outSagawa = sRecs.map(rec=>toSagawaRow(rec, ctx));
@@ -1204,6 +1251,8 @@ function toB2Row(rec, ctx){
   o['運賃管理番号'] = S.s_fare;
   o['検索キータイトル1'] = '注文番号';
   o['検索キー1'] = rec.ids.join(' ');
+  o.__ids = rec.ids.slice();
+  o.__rec = rec;
   return o;
 }
 
@@ -1244,15 +1293,14 @@ function toSagawaRow(rec, ctx){
     tag.numTo !== 'drop' ? tag.codes.join(' ') : '',
     tag.aucTo !== 'drop' ? tag.aucs.join(' ') : ''
   ].filter(Boolean);
-  let rest = joinNames(rec, defItem);
-  const slots = [];
-  for(let i=0; i<5 && rest; i++){ const pp = splitW(rest, 32); slots.push(pp[0]); rest = pp[1]; }
+  const rest = joinNames(rec, defItem);
+  let slots = splitHalfFullRuns(rest, 32).slice(0, 5);
   tailParts.forEach(part=>{
     if(slots.length < 5) slots.push(cutW(part, 32));
     else slots[4] = cutW(slots[4] + ' ' + part, 32); /* 5欄使い切ったときだけ最後の欄に同居 */
   });
   slots.forEach((v,i)=>{ o['品名'+(i+1)] = v; });
-  o['出荷個数'] = '1';
+  o['出荷個数'] = String(Math.max(1, parseInt(rec.qty, 10) || 1));
   o['支払方法'] = rec.pay || '';   /* 出力列ではない。代引検知の警告用 */
   o['配達日'] = compact(rec.reqDate).replace(/[^0-9]/g,'');
   o['配達指定時間帯'] = sgTimeCode(rec.reqTimeRaw);
@@ -1265,6 +1313,8 @@ function toSagawaRow(rec, ctx){
     o['指定シール1'] = CAREMARK_CODES.handling; /* 取扱注意 */
     o['指定シール2'] = CAREMARK_CODES.updown;   /* 天地無用 */
   }
+  o.__ids = rec.ids.slice();
+  o.__rec = rec;
   return o;
 }
 
@@ -1296,6 +1346,12 @@ function checkRow(o, carrier){
   return bad;
 }
 
+/* 郵便番号・電話番号・品名1が同じ行を「重複の疑いあり」として検出する（列名は両社共通） */
+function dupKey(o){
+  const zip = (o['お届け先郵便番号']||'').trim(), tel = (o['お届け先電話番号']||'').trim(), hin = (o['品名1']||'').trim();
+  if(!zip && !tel) return '';
+  return zip+'|'+tel+'|'+hin;
+}
 let activeCols = B2COLS.slice();
 function colsFor(carrier){ return carrier === 'sagawa' ? SGCOLS : B2COLS; }
 function reqFor(carrier){ return carrier === 'sagawa' ? SG_REQUIRED : REQUIRED; }
@@ -1314,21 +1370,27 @@ function computeActiveCols(){
 function render(){
   activeCols = computeActiveCols();
   const thead = $('#prevTable thead'), tbody = $('#prevTable tbody');
-  thead.innerHTML = '<tr><th>#</th>' + activeCols.map(c=>'<th>'+escapeHtml(c)+'</th>').join('') + '</tr>';
+  thead.innerHTML = '<tr><th>#</th>' + activeCols.map(c=>'<th>'+escapeHtml(c)+'</th>').join('') + '<th>操作</th></tr>';
   const frag = document.createDocumentFragment();
   let errN = 0, warnN = 0; const msgs = [];
+  const dupCounts = new Map();
+  outRows.forEach(o=>{ const k = dupKey(o); if(k){ dupCounts.set(k, (dupCounts.get(k)||0)+1); } });
+  let dupN = 0;
   outRows.forEach((o, i)=>{
     const bad = checkRow(o, viewCarrier);
     let hasE = false, hasW = false;
     for(const k in bad){ if(bad[k].lvl==='bad'){ hasE = true; } else hasW = true; }
     if(hasE) errN++; if(hasW && !hasE) warnN++;
+    const isDup = dupCounts.get(dupKey(o)) > 1;
+    if(isDup) dupN++;
     if(i < 200){
       const tr = document.createElement('tr');
-      let html = '<td class="idx">'+(i+1)+'</td>';
+      let html = '<td class="idx">'+(i+1)+(isDup?' <span class="pill warn" title="郵便番号・電話番号・品名1が同じ行が他にもあります">重複?</span>':'')+'</td>';
       activeCols.forEach(c=>{
         const b = bad[c];
         html += '<td contenteditable="true" data-r="'+i+'" data-c="'+escapeHtml(c)+'"'+(b?' class="'+(b.lvl==='bad'?'bad':'warn')+'" title="'+escapeHtml(b.msg)+'"':'')+'>'+escapeHtml(o[c])+'</td>';
       });
+      html += '<td><button type="button" class="ghost rowdel" data-i="'+i+'" style="padding:3px 10px;font-size:11.5px">削除</button></td>';
       tr.innerHTML = html;
       frag.appendChild(tr);
     }
@@ -1338,13 +1400,16 @@ function render(){
   });
   tbody.innerHTML = ''; tbody.appendChild(frag);
 
+  const exCount = Array.from(excludedRows).filter(k=>k.startsWith(viewCarrier+'|')).length;
   const st = $('#statusBar');
   st.innerHTML = '<span class="pill">'+outRows.length+'件</span>'
     + (skippedCount ? '<span class="pill">対象外 '+skippedCount+'件</span>' : '')
     + (codCount ? '<span class="pill err">代引 '+codCount+'件を除外</span>' : '')
+    + (exCount ? '<span class="pill">削除済み '+exCount+'件</span>' : '')
     + (activeCols.length < colsFor(viewCarrier).length ? '<span class="pill">'+activeCols.length+'列（空の'+(colsFor(viewCarrier).length-activeCols.length)+'列を省略）</span>' : '')
     + (errN ? '<span class="pill err">要修正 '+errN+'件</span>' : '<span class="pill ok">エラーなし</span>')
-    + (warnN ? '<span class="pill warn">確認 '+warnN+'件</span>' : '');
+    + (warnN ? '<span class="pill warn">確認 '+warnN+'件</span>' : '')
+    + (dupN ? '<span class="pill warn">重複の疑い '+dupN+'件</span>' : '');
   const box = $('#msgBox');
   if(msgs.length){
     box.hidden = false;
@@ -1362,7 +1427,59 @@ function render(){
   $('#viewS').style.borderColor = viewCarrier === 'sagawa' ? 'var(--accent)' : 'var(--rule)';
   $('#viewY').style.color = viewCarrier === 'yamato' ? 'var(--accent)' : 'var(--muted)';
   $('#viewS').style.color = viewCarrier === 'sagawa' ? 'var(--accent)' : 'var(--muted)';
+  $('#btnDelDup').hidden = dupN === 0;
+  $('#btnUndoDel').hidden = deletedStack.length === 0;
 }
+
+/* 行の削除・復元 */
+function deleteRow(i){
+  const arr = (viewCarrier === 'sagawa') ? outSagawa : outYamato;
+  const o = arr[i];
+  if(!o) return;
+  const key = rowKey(viewCarrier, o.__ids || [o['お客様管理番号']]);
+  excludedRows.add(key);
+  arr.splice(i, 1);
+  deletedStack.push({carrier: viewCarrier, obj: o, key: key});
+  outRows = (viewCarrier === 'sagawa') ? outSagawa : outYamato;
+  render();
+}
+function undoLastDelete(){
+  const last = deletedStack.pop();
+  if(!last) return;
+  excludedRows.delete(last.key);
+  const arr = (last.carrier === 'sagawa') ? outSagawa : outYamato;
+  arr.push(last.obj);
+  outRows = (viewCarrier === 'sagawa') ? outSagawa : outYamato;
+  render();
+}
+/* 郵便番号・電話番号・品名1が同じ行のうち、2件目以降をまとめて削除する */
+function removeDuplicates(){
+  const arr = (viewCarrier === 'sagawa') ? outSagawa : outYamato;
+  const seen = new Set();
+  const kept = [];
+  arr.forEach(o=>{
+    const k = dupKey(o);
+    if(k && seen.has(k)){
+      const key = rowKey(viewCarrier, o.__ids || [o['お客様管理番号']]);
+      excludedRows.add(key);
+      deletedStack.push({carrier: viewCarrier, obj: o, key: key});
+    } else {
+      if(k) seen.add(k);
+      kept.push(o);
+    }
+  });
+  arr.length = 0;
+  kept.forEach(o=> arr.push(o));
+  outRows = (viewCarrier === 'sagawa') ? outSagawa : outYamato;
+  render();
+}
+$('#btnDelDup').addEventListener('click', removeDuplicates);
+$('#btnUndoDel').addEventListener('click', undoLastDelete);
+$('#prevTable').addEventListener('click', e=>{
+  const btn = e.target.closest('.rowdel');
+  if(!btn) return;
+  deleteRow(+btn.dataset.i);
+});
 $('#prevTable').addEventListener('input', e=>{
   const td = e.target;
   if(!td.dataset || td.dataset.r===undefined) return;
@@ -1415,7 +1532,12 @@ $('#dlSG').addEventListener('click', ()=>{
   writeCsv('sagawa', outSagawa, 'sagawa_ehiden_'+compact($('#o_date').value||today())+'.csv');
 });
 $('#dlMap').addEventListener('click', ()=>{
-  const rows = srcRecords.map((r,i)=>({'お客様管理番号':outRows[i]['お客様管理番号'],'注文番号':r.ids.join(' '),'お届け先名':r.name}));
+  /* 削除した行を除いた、実際に書き出す行だけを対象にする */
+  const rows = outYamato.concat(outSagawa).map(o=>({
+    'お客様管理番号': o['お客様管理番号'],
+    '注文番号': o.__rec ? o.__rec.ids.join(' ') : '',
+    'お届け先名': o.__rec ? o.__rec.name : ''
+  }));
   const text = buildCSV(['お客様管理番号','注文番号','お届け先名'], rows);
   download('order_map_'+compact(today())+'.csv', encodeUtf8Bom(text).bytes);
 });
@@ -1484,14 +1606,16 @@ window.__b2 = {
   get outRows(){ return outRows; },
   get srcRecords(){ return srcRecords; },
   parseCSV, buildCSV, encodeSjis, encodeUtf8Bom, decodeAuto,
-  cleanName, pickCode, splitW, splitAddr, cutW, detailValues,
+  cleanName, pickCode, splitW, splitAddr, cutW, detailValues, splitHalfFullRuns,
   get activeCols(){ return activeCols; },
   get outYamato(){ return outYamato; },
   get outSagawa(){ return outSagawa; },
   SGCOLS, SG_LIMITS, SG_REQUIRED, sgTimeCode, switchView,
   get codCount(){ return codCount; },
-  get eachPending(){ return eachPending; }, get orderTo(){ return orderTo; },
-  width, cleanTel, cleanZip, toHalfKana, timeCode, checkRow, convert
+  get eachPending(){ return eachPending; }, get orderTo(){ return orderTo; }, get orderQty(){ return orderQty; },
+  width, cleanTel, cleanZip, toHalfKana, timeCode, checkRow, convert,
+  dupKey, deleteRow, undoLastDelete, removeDuplicates,
+  get excludedRows(){ return excludedRows; }, get deletedStack(){ return deletedStack; }
 };
 
 /* ===================== init ===================== */
