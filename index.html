@@ -365,6 +365,9 @@ footer.foot{max-width:1180px;margin:0 auto;padding:24px 18px 0;border-top:1px so
         </label>
         <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="o_caremark" checked style="width:auto"> ケアマーク（取扱注意・天地無用）を毎回付ける<span class="mono" style="color:var(--muted)">（指定シール1=011, 2=013）</span></label>
       </div>
+      <div class="row" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--rule-soft)">
+        <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="o_addrCram" style="width:auto"> 住所欄を全角16文字ぎりぎりまで目一杯詰める<span class="mono" style="color:var(--muted)">（実験・診断用。半角/全角混在の桁あふれ対策は効かなくなります）</span></label>
+      </div>
     </div>
   </div>
 
@@ -461,7 +464,7 @@ footer.foot{max-width:1180px;margin:0 auto;padding:24px 18px 0;border-top:1px so
 
 <footer class="foot">
   <p><b>ヤマトB2クラウド：</b>「外部データから発行」→ 取込みパターン「新規レイアウト」。紐付けは取込み開始行「1」で行い、実行時は「2」に変更します。文字コードはShift_JIS。</p>
-  <p><b>佐川e飛伝Ⅲ：</b>「送り状データ取込」→ テンプレートを「CSV(ヘッダ有)」で新規作成し、<b>見出し名で</b>項目を関連付けます（位置での自動割当はズレの原因になります）。CSVの列はe飛伝の項目順に並べ、空の列も残してあります。「お届け先住所1」「お届け先名称1」の関連付けは必須。品名は全角16文字を超えるとエラーになるため「桁溢れ時にオーバー分を切り捨てて取り込む」にチェックを。文字コードは環境設定に合わせて（既定はUTF-8）。</p>
+  <p><b>佐川e飛伝Ⅲ：</b>「送り状データ取込」→ テンプレートを「CSV(ヘッダ有)」で新規作成し、<b>見出し名で</b>項目を関連付けます（位置での自動割当はズレの原因になります）。CSVの列はe飛伝の項目順に並べ、空の列も残してあります。「お届け先住所1」「お届け先名称1」の関連付けは必須。住所・名称・品名の各欄は全角16文字までで、超えた分は次の欄（住所2・3、名称2、品名2〜5）へ自動的に折り返しています。なお1つの欄の中で半角と全角の文字が混在すると、取込み側でその欄全体が全角扱いになり字あふれの原因になるため、本ツールでは欄をまたぐ際に半角のかたまり・全角のかたまりが混ざらないようにしています。品名は全角16文字を超えるとエラーになるため「桁溢れ時にオーバー分を切り捨てて取り込む」にチェックを。また品名欄に半角スペースが残っていると取込エラーになるため、本ツールでは品名欄の半角スペースを自動的に取り除いています。文字コードは環境設定に合わせて（既定はUTF-8）。</p>
   <p>どちらも出力後は取込結果画面でエラーを確認してください。</p>
 </footer>
 </div>
@@ -678,6 +681,28 @@ function splitHalfFullRuns(s, max){
   });
   return slots.map(x=>x.trim()).filter(Boolean);
 }
+/* splitHalfFullRunsの結果を、実際に用意されている欄数nに収める。
+   欄数を超える分（かなり稀）は最後の欄にまとめて詰め込む */
+function packHalfFullRuns(s, max, n){
+  const runs = splitHalfFullRuns(s, max);
+  if(runs.length <= n) return runs;
+  const head = runs.slice(0, n-1);
+  head.push(cutW(runs.slice(n-1).join(' '), max));
+  return head;
+}
+/* 診断用：半角/全角混在を気にせず、splitAddrで欄をn個まで目一杯詰める。
+   佐川e飛伝Ⅲ側でCSVの区切り位置が表示・印字に反映されるのかどうかを
+   実機で確認するための一時的な比較用ロジック */
+function crammedSplit(s, max, n){
+  const out = [];
+  let rest = String(s||'').trim();
+  while(rest && out.length < n){
+    const [a, b] = splitAddr(rest, max);
+    out.push(a);
+    rest = b;
+  }
+  return out;
+}
 
 /* 明細セルは「L1=…（改行）L2=…」の形で複数商品が入る */
 function detailValues(v){
@@ -837,10 +862,16 @@ const SGCOLS = ['お届け先コード取得区分','お届け先コード',
 /* 空でも必ず書き出す列。ここを空で明示しないとe飛伝側が電話番号などを自動で埋めることがある */
 const SG_ALWAYS = ['お届け先コード取得区分','お届け先コード','ご依頼主コード取得区分','ご依頼主コード',
   '指定シール1','指定シール2','指定シール3'];
+/* 住所・名称欄は実機の入力欄表示のとおり全角16文字（幅32）が上限。
+   以前「全角15文字までしか入らない」ように見えたのは上限の問題ではなく、
+   欄の中で半角と全角が混在すると全角換算されて字あふれる現象が原因だったため、
+   上限は16文字に戻し、代わりに欄の中で半角/全角を混在させないようにする */
+const SG_ADDR_MAX = 32;
 const SG_LIMITS = {'お客様管理番号':16,'お届け先電話番号':14,'お届け先郵便番号':8,
-  'お届け先住所1':32,'お届け先住所2':32,'お届け先住所3':32,'お届け先名称1':32,'お届け先名称2':32,
-  'ご依頼主電話番号':14,'ご依頼主郵便番号':8,'ご依頼主住所1':32,'ご依頼主住所2':32,
-  'ご依頼主名称1':32,'ご依頼主名称2':32,
+  'お届け先住所1':SG_ADDR_MAX,'お届け先住所2':SG_ADDR_MAX,'お届け先住所3':SG_ADDR_MAX,
+  'お届け先名称1':SG_ADDR_MAX,'お届け先名称2':SG_ADDR_MAX,
+  'ご依頼主電話番号':14,'ご依頼主郵便番号':8,'ご依頼主住所1':SG_ADDR_MAX,'ご依頼主住所2':SG_ADDR_MAX,
+  'ご依頼主名称1':SG_ADDR_MAX,'ご依頼主名称2':SG_ADDR_MAX,
   '品名1':32,'品名2':32,'品名3':32,'品名4':32,'品名5':32,'出荷個数':3,'配達日':8,'配達指定時間帯':2,'保険金額':9,'出荷日':8,
   '指定シール1':3,'指定シール2':3,'指定シール3':3};
 /* ケアマーク（指定シール）区分値。佐川急便 e飛伝Ⅲ 区分値一覧より */
@@ -1031,7 +1062,7 @@ function syncNameSrc(){
   $('#wrapNameCol').hidden = $('#o_nameSrc').value !== 'col';
 }
 ['o_date','o_kind','o_item','o_hono','o_merge','o_reqdate','o_over','o_nameCol',
- 'o_multi','o_stripL','o_stripB','o_stripN','o_numTo','o_aucTo','o_dropEmpty','o_hoken','o_hokenP','o_sgCode','o_dropCod','o_caremark'].forEach(id=>{
+ 'o_multi','o_stripL','o_stripB','o_stripN','o_numTo','o_aucTo','o_dropEmpty','o_hoken','o_hokenP','o_sgCode','o_dropCod','o_caremark','o_addrCram'].forEach(id=>{
   const el = $('#'+id); if(el) el.addEventListener('change', convert);
 });
 $('#o_nameSrc').addEventListener('change', ()=>{ syncNameSrc(); store('b2conv.nameSrc', $('#o_nameSrc').value); convert(); });
@@ -1268,38 +1299,46 @@ function toSagawaRow(rec, ctx){
   o['お客様管理番号'] = cutW(rec.ids[0], 16);
   o['お届け先電話番号'] = rec.tel;
   o['お届け先郵便番号'] = rec.zip;
-  /* 住所は全角16文字ずつ3欄に分ける */
+  /* 住所・名称は、欄の中で半角と全角を混在させないように分ける
+     （品名欄と同じ理由：混在すると欄全体が全角換算され桁あふれの原因になる）。
+     ただし「住所を全角16文字ぎりぎりまで詰める」実験モードがONのときは、
+     e飛伝Ⅲ側でCSVの区切り位置が実際の表示に反映されるかどうかを確かめるため
+     混在対策なしでとにかく欄を詰め切るcrammedSplitを使う */
+  const addrCram = !!($('#o_addrCram') && $('#o_addrCram').checked);
   const full = [rec.addr, rec.bld].filter(Boolean).join(' ');
-  const a1 = splitAddr(full, 32);
-  const a2 = splitAddr(a1[1], 32);
-  o['お届け先住所1'] = a1[0];
-  o['お届け先住所2'] = a2[0];
-  o['お届け先住所3'] = cutW(a2[1], 32);
-  const n1 = splitW(rec.name, 32);
-  o['お届け先名称1'] = n1[0];
-  o['お届け先名称2'] = cutW(n1[1], 32);
+  const addrParts = addrCram ? crammedSplit(full, SG_ADDR_MAX, 3) : packHalfFullRuns(full, SG_ADDR_MAX, 3);
+  o['お届け先住所1'] = addrParts[0] || '';
+  o['お届け先住所2'] = addrParts[1] || '';
+  o['お届け先住所3'] = addrParts[2] || '';
+  const nameParts = packHalfFullRuns(rec.name, SG_ADDR_MAX, 2);
+  o['お届け先名称1'] = nameParts[0] || '';
+  o['お届け先名称2'] = nameParts[1] || '';
   o['ご依頼主電話番号'] = S.s_tel;
   o['ご依頼主郵便番号'] = S.s_zip;
-  const s1 = splitAddr(S.s_addr, 32);
-  o['ご依頼主住所1'] = s1[0];
-  o['ご依頼主住所2'] = cutW(s1[1], 32);
-  const m1 = splitW(S.s_name, 32);
-  o['ご依頼主名称1'] = m1[0];
-  o['ご依頼主名称2'] = cutW(m1[1], 32);
+  const sAddrParts = addrCram ? crammedSplit(S.s_addr, SG_ADDR_MAX, 2) : packHalfFullRuns(S.s_addr, SG_ADDR_MAX, 2);
+  o['ご依頼主住所1'] = sAddrParts[0] || '';
+  o['ご依頼主住所2'] = sAddrParts[1] || '';
+  const sNameParts = packHalfFullRuns(S.s_name, SG_ADDR_MAX, 2);
+  o['ご依頼主名称1'] = sNameParts[0] || '';
+  o['ご依頼主名称2'] = sNameParts[1] || '';
   /* 品名は全角16文字ずつ最大5欄。管理番号とオークションIDは最後の欄に載せる */
   const tag = extraTags(rec);
-  /* 管理番号とオークションIDは1本の文字列に混ぜず、別々の品名欄に分けて載せる */
+  /* 管理番号とオークションIDは1本の文字列に混ぜず、別々の品名欄に分けて載せる。
+     区切りには半角スペースではなく全角スペースを使う（理由は下の.replace参照） */
   const tailParts = [
-    tag.numTo !== 'drop' ? tag.codes.join(' ') : '',
-    tag.aucTo !== 'drop' ? tag.aucs.join(' ') : ''
+    tag.numTo !== 'drop' ? tag.codes.join('　') : '',
+    tag.aucTo !== 'drop' ? tag.aucs.join('　') : ''
   ].filter(Boolean);
   const rest = joinNames(rec, defItem);
   let slots = splitHalfFullRuns(rest, 32).slice(0, 5);
   tailParts.forEach(part=>{
     if(slots.length < 5) slots.push(cutW(part, 32));
-    else slots[4] = cutW(slots[4] + ' ' + part, 32); /* 5欄使い切ったときだけ最後の欄に同居 */
+    else slots[4] = cutW(slots[4] + '　' + part, 32); /* 5欄使い切ったときだけ最後の欄に同居 */
   });
-  slots.forEach((v,i)=>{ o['品名'+(i+1)] = v; });
+  /* 佐川e飛伝Ⅲは品名欄に半角スペースが残っていると取込エラーになるため、
+     商品名に元から含まれる半角スペースも含めてここで完全に取り除く
+     （全角スペースは問題ないため、上の区切りは全角スペースのままにしている） */
+  slots.forEach((v,i)=>{ o['品名'+(i+1)] = String(v||'').replace(/ /g, ''); });
   o['出荷個数'] = String(Math.max(1, parseInt(rec.qty, 10) || 1));
   o['支払方法'] = rec.pay || '';   /* 出力列ではない。代引検知の警告用 */
   o['配達日'] = compact(rec.reqDate).replace(/[^0-9]/g,'');
@@ -1606,11 +1645,11 @@ window.__b2 = {
   get outRows(){ return outRows; },
   get srcRecords(){ return srcRecords; },
   parseCSV, buildCSV, encodeSjis, encodeUtf8Bom, decodeAuto,
-  cleanName, pickCode, splitW, splitAddr, cutW, detailValues, splitHalfFullRuns,
+  cleanName, pickCode, splitW, splitAddr, cutW, detailValues, splitHalfFullRuns, packHalfFullRuns, crammedSplit,
   get activeCols(){ return activeCols; },
   get outYamato(){ return outYamato; },
   get outSagawa(){ return outSagawa; },
-  SGCOLS, SG_LIMITS, SG_REQUIRED, sgTimeCode, switchView,
+  SGCOLS, SG_LIMITS, SG_REQUIRED, SG_ADDR_MAX, sgTimeCode, switchView,
   get codCount(){ return codCount; },
   get eachPending(){ return eachPending; }, get orderTo(){ return orderTo; }, get orderQty(){ return orderQty; },
   width, cleanTel, cleanZip, toHalfKana, timeCode, checkRow, convert,
