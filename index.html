@@ -612,6 +612,13 @@ function toHalfKana(s){
   for(const ch of s) o += (KANA_F2H[ch] !== undefined ? KANA_F2H[ch] : ch);
   return toHalfAlnum(o);
 }
+/* コピー＆ペーストで紛れ込みやすい、見た目は半角スペースと同じだが別の文字である
+   空白（ノーブレークスペース U+00A0 など）を、ふつうの半角スペースに統一する。
+   これをしないと「半角スペース除去」などの処理が効かず、見た目は同じなのに
+   取込エラーになる事例があった（NBSPは項目属性チェックに引っかかる） */
+function normSpace(s){
+  return String(s||'').replace(/[   -   ﻿]/g, ' ');
+}
 function width(s){
   let n=0;
   for(const ch of String(s||'')){
@@ -1093,11 +1100,11 @@ function sgTimeCode(v){
   const k = parseInt(n[0],10)+'-'+parseInt(n[1],10);
   return ({'8-12':'01','9-12':'01','12-14':'12','14-16':'14','16-18':'16','18-20':'18','18-21':'18','19-21':'19'})[k] || '';
 }
-function get(r, key){ const i = mapping[key]; return (i>=0 && r[i]!==undefined) ? String(r[i]).trim() : ''; }
+function get(r, key){ const i = mapping[key]; return (i>=0 && r[i]!==undefined) ? normSpace(String(r[i]).trim()) : ''; }
 
 function convert(){
   if(!ordersRows || ordersRows.length<2){ return; }
-  const S = {}; SFIELDS.forEach(id=> S[id] = $('#'+id).value.trim());
+  const S = {}; SFIELDS.forEach(id=> S[id] = normSpace($('#'+id).value.trim()));
   const shipDate = slash($('#o_date').value);
   const defKind = $('#o_kind').value;
   const defItem = $('#o_item').value.trim();
@@ -1337,8 +1344,10 @@ function toSagawaRow(rec, ctx){
   });
   /* 佐川e飛伝Ⅲは品名欄に半角スペースが残っていると取込エラーになるため、
      商品名に元から含まれる半角スペースも含めてここで完全に取り除く
-     （全角スペースは問題ないため、上の区切りは全角スペースのままにしている） */
-  slots.forEach((v,i)=>{ o['品名'+(i+1)] = String(v||'').replace(/ /g, ''); });
+     （全角スペースは問題ないため、上の区切りは全角スペースのままにしている）。
+     normSpaceで念のためNBSPなど見た目が同じ別の空白文字も通常の半角スペースに
+     揺すってから取り除く（コピペ元のタイトルに紛れていた場合の保険） */
+  slots.forEach((v,i)=>{ o['品名'+(i+1)] = normSpace(String(v||'')).replace(/ /g, ''); });
   o['出荷個数'] = String(Math.max(1, parseInt(rec.qty, 10) || 1));
   o['支払方法'] = rec.pay || '';   /* 出力列ではない。代引検知の警告用 */
   o['配達日'] = compact(rec.reqDate).replace(/[^0-9]/g,'');
@@ -1645,7 +1654,7 @@ window.__b2 = {
   get outRows(){ return outRows; },
   get srcRecords(){ return srcRecords; },
   parseCSV, buildCSV, encodeSjis, encodeUtf8Bom, decodeAuto,
-  cleanName, pickCode, splitW, splitAddr, cutW, detailValues, splitHalfFullRuns, packHalfFullRuns, crammedSplit,
+  cleanName, pickCode, splitW, splitAddr, cutW, detailValues, splitHalfFullRuns, packHalfFullRuns, crammedSplit, normSpace,
   get activeCols(){ return activeCols; },
   get outYamato(){ return outYamato; },
   get outSagawa(){ return outSagawa; },
